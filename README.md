@@ -31,6 +31,16 @@ Easy课表是一个**完全离线**的 Android 课表应用：直接从学校的
 
 所以这个 App 做了三件事：**把课表导进来**、**把今天讲清楚**、**把要做的事记下来并叫醒你**。
 
+## 下载 / 安装
+
+- **最新安装包**：[Releases · v0.13.0-launch](https://github.com/chapwpzip/EasyKeBiao/releases/tag/v0.13.0-launch)
+  （`EasyKeBiao-v0.13.0-launch.apk`，25.59 MB，arm64-v8a / armeabi-v7a / x86 / x86_64 四 ABI 整包，`versionCode 26`）
+- 支持 **Android 8.0（API 26）及以上**，直接安装，无需注册账号
+- 覆盖安装即可升级，数据库会按内置迁移逐步升级，**课表不会丢**
+
+> 当前发布的是 **debug 签名** 测试包（包名 `com.imsx3d.classy.debug`），可与正式版共存；
+> 正式签名版本需自备 keystore 自行构建（见下方「构建」）。
+
 ## 界面
 
 | 课表 | 今日 | 备忘录 / 待办 |
