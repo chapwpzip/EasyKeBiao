@@ -51,7 +51,7 @@ Easy课表是一个**完全离线**的 Android 课表应用：直接从学校的
 
 | 我的 | 桌面小组件 | 应用图标（自适应） |
 | --- | --- | --- |
-| 待补充 | ![桌面小组件：课表组件 + 待办组件](docs/screenshots/04-desktop-widgets.jpg) | ![自适应图标](docs/brand/icon-adaptive.png) |
+| 待补充 | 待补充 | ![自适应图标](docs/brand/icon-adaptive.png) |
 
 > 截图会在 `docs/screenshots/` 里按 `01-schedule.jpg`、`02-memo.jpg`…… 命名，当前先放了一张实机图，其余正在补。
 
