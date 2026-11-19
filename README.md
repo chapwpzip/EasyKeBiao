@@ -193,9 +193,9 @@ tools/               # 构建期辅助脚本（图标生成等）
 | --- | --- | --- |
 | [IMSX3D/Classy](https://github.com/IMSX3D/Classy) | GPL-3.0 | **上游基础**：课表数据层、教务适配框架、桌面小组件、导出、设置与大部分页面结构 |
 | [NevoDev/Cresto](https://github.com/NevoDev/Cresto) | Apache-2.0 | **UI 组件参考与移植**：玻璃外观（内阴影+高光）、倾斜按压、着色器涟漪、带模糊的进出场、礼花按钮；待办的数据形态与交互也参考了它 |
-| [Nevoit Glasense UI](https://github.com/NevoDev)（`glasense-ui` 本地模块，随上游提供） | 见模块内声明 | 设计体系：颜色、排版、形状、基础组件 |
-| [Kyant0/backdrop](https://github.com/Kyant0/backdrop) | Apache-2.0 | 真实高斯模糊玻璃 / 折射（Dock 与按钮） |
-| [Kyant0/shapes](https://github.com/Kyant0/shapes) | Apache-2.0 | 胶囊等形状 |
+| Glasense UI（上游附带的本地模块 `glasense-ui`） | 见模块内声明 | 设计体系：颜色、排版、形状、基础组件 |
+| [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass)（Maven `io.github.kyant0:backdrop`） | Apache-2.0 | 真实高斯模糊玻璃 / 折射（Dock 与按钮） |
+| [Kyant0/Shapes](https://github.com/Kyant0/Shapes)（Maven `io.github.kyant0:shapes`） | Apache-2.0 | 胶囊等形状 |
 | [xioajiumi/Chinese_Universities](https://github.com/xioajiumi/Chinese_Universities) | 见仓库声明 | 高校名录（582 所）作为教务入口探测的输入 |
 | [pypinyin](https://github.com/mozillazg/python-pinyin) | MIT | 生成学校名的拼音排序键（构建期工具，不随 App 分发） |
 | [AndroidX / Jetpack Compose / Room / WorkManager](https://developer.android.com/jetpack) | Apache-2.0 | 应用框架 |
