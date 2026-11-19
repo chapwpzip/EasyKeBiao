@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 待办组件的一行：勾选框（点了就切换完成）+ 标题 + 截止文案。
+     字号按「桌面上要能看清、圈要能点到」定：标题 15sp、截止 12sp、圈 20dp、行高靠 9dp 内边距撑。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_todo_row"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingTop="9dp"
+    android:paddingBottom="9dp">
+
+    <ImageView
+        android:id="@+id/widget_todo_check"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:src="@drawable/widget_todo_check_off"
+        android:contentDescription="@string/widget_todo_label" />
+
+    <TextView
+        android:id="@+id/widget_todo_row_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="10dp"
+        android:textColor="@color/widget_todo_text"
+        android:textSize="15sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/widget_todo_row_due"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:textColor="@color/widget_todo_text_dim"
+        android:textSize="12sp"
+        android:maxLines="1" />
+</LinearLayout>

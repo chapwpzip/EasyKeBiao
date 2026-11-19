@@ -1,0 +1,184 @@
+package com.imsx3d.classy.ui.screen.imports
+
+/**
+ * T5 新增: 新版正方在 WebView 内 fetch 课表 JSON。
+ *
+ * 流程 (参考 HUEL_adapter.js + UJS_zhengfang_v9.0.js):
+ *   1) 路径指纹: /jwglxt/、/kbcx/ (广东医科等新版) 或 WebVPN /http/<hex>/, 否则 NOT_ON_TIMETABLE
+ *   2) gnmkdm 从 URL 抄, 缺省 N2151
+ *   3) 推导 pathPrefix: 旧/WebVPN = '/jwglxt'; 新版裸 /kbcx/ = '' (path 自带 /kbcx/)
+ *   4) 三段兜底取 (xnm,xqm): URL → 页面 #xnm/#xqm → fetch index 页 + native 选学期
+ *   5) POST pathPrefix + /kbcx/xskbcx_cxXsgrkb.html 拿 JSON
+ *   6) 嗅探: kbList → OK; login_slogin+csrftoken+密码框 → SESSION_EXPIRED; 解析失败 → SESSION_EXPIRED
+ *   7) 回调 {ok, data, format:'zf_new'} 给 native, JwImportViewModel.parseZfNewBridgeResult 拆包
+ *
+ * 失败兜底: 捕获任何异常 → onWiseduResult({ok:false, kind:'FORMAT_ERROR', err}),
+ * 由 native 侧 tryAllParsers 已抓到的 outerHTML 接管。
+ */
+const val ZF_NEW_FETCH_JS = """(function(){
+  function fail(kind, err){
+    window.__sleepyBridge.onWiseduResult(JSON.stringify({
+      ok:false, kind:kind, err:err||'', format:'zf_new'
+    }));
+  }
+  function ok(data, xnm, xqm, empty, routine){
+    // Read only explicit single-period row headings; never infer a lesson time from course text.
+    var periods = [], seen = {}, conflicts = {};
+    function add(node, start, end) {
+      var n = String(node == null ? '' : node).trim().match(/^(?:第\s*)?(\d{1,2})\s*(?:节)?$/);
+      var a = String(start || '').trim().match(/^(\d{1,2})[:：](\d{2})$/);
+      var b = String(end || '').trim().match(/^(\d{1,2})[:：](\d{2})$/);
+      if (!n || !a || !b) return;
+      node=+n[1]; var sh=+a[1], sm=+a[2], eh=+b[1], em=+b[2];
+      if (node<1 || node>48 || sh>23 || eh>23 || sm>59 || em>59 || sh*60+sm>=eh*60+em) return;
+      function pad(v){return ('0'+v).slice(-2);}
+      var period={node:node,start:pad(sh)+':'+pad(sm),end:pad(eh)+':'+pad(em)};
+      if (seen[node] && (seen[node].start!==period.start || seen[node].end!==period.end)) conflicts[node]=true;
+      seen[node]=period;
+    }
+    // The authenticated routine endpoint supplies per-node times, independently of DOM layout.
+    (Array.isArray(routine) ? routine : []).forEach(function(row){
+      if (row && typeof row === 'object') add(row.jcmc, row.qssj, row.jssj);
+    });
+    // Use headings only when the routine endpoint has no usable rows. Do not mix campuses/terms.
+    var headings = Object.keys(seen).length ? [] : document.querySelectorAll('tr > th, tr > td:first-child');
+    for (var i=0; i<headings.length; i++) {
+      var txt = (headings[i].innerText || headings[i].textContent || '').trim();
+      var match = txt.match(/^(?:第\s*)?(\d{1,2})\s*(?:节)?\s*[（(\[]?\s*(\d{1,2})[:：](\d{2})\s*[-~～—至]\s*(\d{1,2})[:：](\d{2})\s*[）)\]]?$/);
+      if (!match) continue;
+      add(match[1], match[2]+':'+match[3], match[4]+':'+match[5]);
+    }
+    Object.keys(seen).forEach(function(n){if(!conflicts[n]) periods.push(seen[n]);});
+    periods.sort(function(a,b){return a.node-b.node;});
+    window.__sleepyBridge.onWiseduResult(JSON.stringify({
+      ok:true, data:data, periods:periods, xnm:xnm, xqm:xqm, emptySemester:!!empty, format:'zf_new'
+    }));
+  }
+  try {
+    var path = location.pathname;
+    // T5+/2026-09 新版正方: 旧版路径前缀 /jwglxt/, 新版 (广东医科等) 直接 /kbcx/, WebVPN 改写为 /http/<hex>/
+    var onJwglxt = path.indexOf('/jwglxt/') >= 0;
+    var onKbcx = path.indexOf('/kbcx/') >= 0;
+    var onHttpHex = /\/http\/[0-9a-f]{4,8}\//.test(path);
+    if (!onJwglxt && !onKbcx && !onHttpHex) {
+      fail('NOT_ON_TIMETABLE', '请先导航到个人课表页(地址应含 /jwglxt/ 或 /kbcx/)');
+      return;
+    }
+    // 推导接口前缀: WebVPN/老 jwglxt = '/jwglxt'; 新版裸 /kbcx/ = '' (path 自带 /kbcx/)
+    var pathPrefix = onJwglxt || onHttpHex ? '/jwglxt' : '';
+
+    var search = location.search.substring(1);
+    var params = {};
+    search.split('&').forEach(function(p){
+      if (!p) return;
+      var kv = p.split('=');
+      params[kv[0]] = decodeURIComponent(kv[1] || '');
+    });
+    var gnmkdm = params['gnmkdm'] || 'N2151';
+
+    function pickTerm(){
+      return new Promise(function(resolve, reject){
+        if (params['xnm'] && params['xqm']) { resolve({xnm:params['xnm'], xqm:params['xqm']}); return; }
+        var sel = document.querySelector('#xnm');
+        var sel2 = document.querySelector('#xqm');
+        if (sel && sel.value && sel2 && sel2.value) {
+          resolve({xnm:String(sel.value).trim(), xqm:String(sel2.value).trim()});
+          return;
+        }
+        var idxPath = pathPrefix + '/kbcx/xskbcx_cxXskbcxIndex.html?gnmkdm=' + encodeURIComponent(gnmkdm) + '&layout=default';
+        fetch(idxPath, {credentials:'include', headers:{'X-Requested-With':'XMLHttpRequest'}})
+          .then(function(r){ return r.text(); })
+          .then(function(html){
+            function selectedTerm(id) {
+              var doc = new DOMParser().parseFromString(html, 'text/html');
+              var select = doc.getElementById(id);
+              if (!select) throw new Error('未找到学期，请先在教务页面选择学期');
+              var options = Array.prototype.filter.call(select.options, function(o){ return o.value.trim() !== ''; });
+              var chosen = options.filter(function(o){ return o.hasAttribute('selected'); });
+              if (chosen.length === 1) return chosen[0].value.trim();
+              if (options.length === 1) return options[0].value.trim();
+              throw new Error('无法确认默认学期，请先在教务页面选择学期后导入');
+            }
+            resolve({xnm:selectedTerm('xnm'), xqm:selectedTerm('xqm')});
+          })
+          .catch(function(e){ reject(e); });
+      });
+    }
+
+    function req(url, method, body){
+      var opts = {
+        method: method,
+        credentials: 'include',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+        }
+      };
+      if (body) opts.body = body;
+      return fetch(url, opts).then(function(r){ return r.text(); });
+    }
+
+    function readRoutine(t, kbList){
+      var campuses = [];
+      kbList.forEach(function(course){
+        var id = String(course && course.xqh_id || '').trim();
+        if (id && campuses.indexOf(id) < 0) campuses.push(id);
+      });
+      if (campuses.length !== 1) return Promise.resolve([]);
+      var controller = new AbortController();
+      var timer = setTimeout(function(){controller.abort();}, 8000);
+      return fetch(pathPrefix + '/kbcx/xskbcx_cxRjc.html?gnmkdm=' + encodeURIComponent(gnmkdm), {
+        method:'POST', credentials:'include', signal:controller.signal,
+        headers:{'X-Requested-With':'XMLHttpRequest', 'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
+        body:'xnm='+encodeURIComponent(t.xnm)+'&xqm='+encodeURIComponent(t.xqm)+'&xqh_id='+encodeURIComponent(campuses[0])
+      }).then(function(r){if (!r.ok) return []; return r.json();})
+        .catch(function(){return [];})
+        .then(function(rows){clearTimeout(timer);return Array.isArray(rows) ? rows : [];});
+    }
+
+    pickTerm().then(function(t){
+      var apiPath = pathPrefix + '/kbcx/xskbcx_cxXsgrkb.html?gnmkdm=' + encodeURIComponent(gnmkdm);
+      var body = 'xnm=' + encodeURIComponent(t.xnm) +
+                 '&xqm=' + encodeURIComponent(t.xqm) +
+                 '&kzlx=ck&xsdm=&kclbdm=&kclxdm=';
+      return req(apiPath, 'POST', body).then(function(text){ return {t:t, text:text}; });
+    }).then(function(o){
+      var text = o.text, t = o.t;
+      var looksLikeLogin = text.indexOf('login_slogin') >= 0
+        && text.indexOf('csrftoken') >= 0
+        && (text.indexOf('请输入密码') >= 0 || text.indexOf('name="mm"') >= 0 || text.indexOf('name="password"') >= 0);
+      if (looksLikeLogin) { fail('SESSION_EXPIRED', '会话已过期,请重新登录'); return; }
+      var data;
+      try { data = JSON.parse(text); } catch(e){ fail('SESSION_EXPIRED', '接口返回非 JSON(可能已过期): '+String(e)); return; }
+      function findKbList(obj, depth){
+        if (depth > 5 || !obj || typeof obj !== 'object') return null;
+        if (Array.isArray(obj)) {
+          for (var i=0;i<obj.length;i++){
+            var r = findKbList(obj[i], depth+1);
+            if (r) return r;
+          }
+          return null;
+        }
+        if (obj.kbList && Array.isArray(obj.kbList)) return obj.kbList;
+        for (var k in obj) {
+          var r = findKbList(obj[k], depth+1);
+          if (r) return r;
+        }
+        return null;
+      }
+      var kbList = findKbList(data, 0);
+      if (!kbList || kbList.length === 0) {
+        ok(JSON.stringify({kbList:[]}), t.xnm, t.xqm, true);
+        return;
+      }
+      return readRoutine(t, kbList).then(function(routine){
+        ok(JSON.stringify({kbList:kbList}), t.xnm, t.xqm, false, routine);
+      });
+    }).catch(function(e){
+      fail('FORMAT_ERROR', String(e));
+    });
+  } catch(err) {
+    fail('FORMAT_ERROR', String(err));
+  }
+})();
+"""

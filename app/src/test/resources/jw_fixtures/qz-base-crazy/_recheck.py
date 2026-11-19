@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+"""Cross-check all qz-base-crazy fixtures vs expected.json using the compiled Sim."""
+import glob, json, os, subprocess, sys
+
+JSOUP_JAR = os.environ.get("JSOUP_JAR") or next(iter(glob.glob(os.path.expanduser(
+    "~/.gradle/caches/modules-2/files-2.1/org.jsoup/jsoup/1.18.1/*/jsoup-1.18.1.jar"))), "")
+DIR = os.path.dirname(os.path.abspath(__file__))
+WORK = os.path.join(DIR, "_sim")
+
+fail = 0
+for name in sorted(os.listdir(DIR)):
+    if not name.endswith(".html"):
+        continue
+    base = name[:-5]
+    exp_path = os.path.join(DIR, base + ".expected.json")
+    if not os.path.exists(exp_path):
+        print(f"SKIP {name} (no expected)")
+        continue
+    with open(exp_path) as f:
+        exp = json.load(f)
+    exp_courses = exp.get("courses", [])
+    proc = subprocess.run(
+        ["java", "-Dfile.encoding=UTF-8", "-cp", f"{JSOUP_JAR}:{WORK}", "Sim", "upstream", os.path.join(DIR, name)],
+        capture_output=True, text=True)
+    got = json.loads(proc.stdout.strip())
+    if got == exp_courses:
+        print(f"PASS {name} ({len(got)} courses)")
+    else:
+        fail += 1
+        print(f"FAIL {name}")
+        print(f"  got   ({len(got)}):")
+        for c in got: print(f"    {c}")
+        print(f"  expect({len(exp_courses)}):")
+        for c in exp_courses: print(f"    {c}")
+sys.exit(1 if fail else 0)

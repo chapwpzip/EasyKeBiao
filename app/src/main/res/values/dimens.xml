@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Every grid column uses the same rounded pixel row height. It follows system text
+         scaling to preserve room for both name and location; content never sets the row height. -->
+    <dimen name="widget_grid_row_h">44dp</dimen>
+    <dimen name="widget_grid_half_row_h">22sp</dimen>
+    <dimen name="widget_grid_cell_name_h">28dp</dimen>
+    <dimen name="widget_grid_cell_room_h">12dp</dimen>
+</resources>

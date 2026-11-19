@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 勾选后的实心圆 + 白勾。桌面组件里没有动画可跑，勾选那一瞬间就靠「空心圈 → 这个实心勾」这一跳来表现。 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/widget_todo_done" />
+        </shape>
+    </item>
+    <item
+        android:drawable="@drawable/widget_todo_check_mark"
+        android:left="4dp"
+        android:top="4dp"
+        android:right="4dp"
+        android:bottom="4dp" />
+</layer-list>

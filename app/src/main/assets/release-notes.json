@@ -1,0 +1,18 @@
+{
+  "versionCode": 26,
+  "versionName": "0.13.0-launch",
+  "notes": {
+    "zh": [
+      "新增「启动直达页面」：设置 → 通用里能选打开应用先落到哪一页（课表 / 今日 / 课表管理 / 备忘录 / 我的）。",
+      "当前选项就显示在这一行的标题上，点开是单选列表，选完即时保存，下次冷启动直接到位。",
+      "出厂默认仍是课表，与旧版行为一致；「恢复默认设置」会把它一起还原。",
+      "教务导入的学校仍是 388 所（上一版扩量）。"
+    ],
+    "en": [
+      "New \"Launch page\": under Settings → General, pick which tab the app opens on (Schedule / Today / Manage / Memo / Mine).",
+      "The current choice is shown as the row title; tapping opens a single-choice list that saves immediately and applies on the next cold start.",
+      "The default is still Schedule, matching previous behaviour, and \"Reset all settings\" restores it.",
+      "School presets remain at 388 from the previous release."
+    ]
+  }
+}

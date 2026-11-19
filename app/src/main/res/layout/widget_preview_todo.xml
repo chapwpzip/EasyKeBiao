@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 启动器组件列表里的静态预览（4×2）。真实内容仍由 TodoWidgetRenderer 画位图。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_todo_preview_bg"
+    android:padding="16dp"
+    android:contentDescription="@string/widget_todo_description">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/widget_todo_label"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:textColor="#1C1C1E" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:lineSpacingExtra="6dp"
+        android:text="@string/widget_todo_preview_sample"
+        android:textSize="13sp"
+        android:textColor="#6C6C70" />
+</LinearLayout>

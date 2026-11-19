@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One rounded background for the entire course span; vertical inset separates courses.
+     The native grid indicator is inset separately and must remain inside this outline. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetTop="5px"
+    android:insetBottom="5px">
+    <shape android:shape="rectangle">
+        <solid android:color="#FFFFFFFF" />
+        <corners android:topLeftRadius="6dp" android:topRightRadius="6dp" android:bottomLeftRadius="6dp" android:bottomRightRadius="6dp" />
+    </shape>
+</inset>

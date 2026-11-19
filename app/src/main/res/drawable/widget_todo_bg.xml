@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 卡片底板：圆角 22dp（与组件位图版同一观感） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/widget_todo_surface" />
+    <corners android:radius="22dp" />
+</shape>

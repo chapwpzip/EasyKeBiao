@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 待办组件配色（深色）。 -->
+<resources>
+    <color name="widget_todo_surface">#1C1C1E</color>
+    <color name="widget_todo_text">#F2F2F7</color>
+    <color name="widget_todo_text_dim">#8E8E93</color>
+    <color name="widget_todo_ring">#48484A</color>
+    <color name="widget_todo_done">#0A84FF</color>
+</resources>
