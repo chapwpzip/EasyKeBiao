@@ -277,9 +277,59 @@ open class WeekGridWidgetProvider : AppWidgetProvider() {
 
         internal fun weekGridMaxNode(data: WeekData): Int {
             val slots = parseTimeSlots(data.days.firstOrNull()?.timeJson ?: "")
-            return (data.days.flatMap { it.courses }
-                .maxOfOrNull { it.startNode + it.step - 1 } ?: slots.size)
-                .coerceAtLeast(1)
+            // BUG-1（2026-11-20 用户报障"小组件与应用内课表不一致"）：旧实现只取
+            // "课程末节次"（max startNode+step-1）当行数 —— 课表有 13 节、最后一节没课时
+            // 组件就只画 12 行，末尾整节被吞、每一行相对 App 都被拉高（同一节课的
+            // Y 位置与高度随之全表漂移）。App 侧永远按 timeJson 的**全部节次**排行
+            // （CourseTableView 用 renderSlots.size），这里必须同口径：取两者较大值。
+            val fromCourses = data.days.flatMap { it.courses }
+                .maxOfOrNull { it.startNode + it.step - 1 } ?: 0
+            return maxOf(slots.size, fromCourses).coerceAtLeast(1)
+        }
+
+        /**
+         * 课程 startNode → 渲染行下标（0 起）。与 App 的 `slotIndexOf` 同口径：按 node
+         * **查表**而不是 `startNode - 1` 硬减 —— 节次节点号非连续（删过节点/边缘节点）
+         * 时硬减会让整列课块上下错位（BUG-2）。
+         */
+        internal fun weekGridRowIndexOf(node: Int, slotNodes: List<Int>): Int {
+            val i = slotNodes.indexOf(node)
+            return if (i >= 0) i else (node - 1).coerceAtLeast(0)
+        }
+
+        /**
+         * 课程块几何（px）—— 渲染器与契约测试的单一事实来源。
+         *
+         * 节次 → 像素的映射口径（与 App 的 CourseTableView 完全一致）：
+         *   rowH = slotH + gapH（一行 = 单节卡高 + 行间空隙）
+         *   top  = bodyTop + gapH + rowIndex × rowH
+         *   h    = slotH × step + gapH × (step - 1)（跨节只减一次空隙，块内无接缝）
+         * 非常规时间课（ownTime，教务导入的 09:50-12:05 这类真实分钟）按**真实分钟比例**
+         * 定位：frac 是 TimeTableUtils.timeToFractionalRows 给出的 (起始行, 结束行) 小数坐标，
+         * 与 App 的 fractional 映射同源 —— 直接按小数乘 rowH，不再吸附到整格（BUG-3:
+         * 旧实现把 ownTime 课也按 node-1 整格摆放，于是"高等数学I 3-5 节"在组件里从
+         * 第 3 节顶开始、高度也不到位）。
+         */
+        internal fun weekGridBlockGeom(
+            rowIndex: Int,
+            step: Int,
+            bodyTop: Float,
+            gapH: Float,
+            slotH: Float,
+            frac: Pair<Float, Float>? = null
+        ): Pair<Float, Float> {
+            val rowH = slotH + gapH
+            val top = if (frac != null) {
+                bodyTop + gapH + frac.first * rowH
+            } else {
+                bodyTop + gapH + rowIndex * rowH
+            }
+            val h = if (frac != null) {
+                ((frac.second - frac.first) * rowH - gapH).coerceAtLeast(slotH)
+            } else {
+                (slotH * step + gapH * (step - 1)).coerceAtLeast(1f)
+            }
+            return top to h
         }
 
         /**
@@ -332,6 +382,15 @@ open class WeekGridWidgetProvider : AppWidgetProvider() {
             // issue#22: 同名课程多地点 — 跨天汇总 course 全集,传给 pickCourseColorIntWithGroupRows
             val allCourses = data.days.flatMap { it.courses }
             val slots = allSlots.take(maxNode)
+            // BUG-2/BUG-3: 行下标（按 node 查表）与"非常规时间"的比例坐标都取 App 的同一张槽位表，
+            // 保证「节次 → Y」与「真实分钟 → Y」两套映射和应用内 CourseTableView 完全同源。
+            val layoutSlots = com.imsx3d.classy.util.TimeTableUtils.timeSlotsFor(timeJson)
+            val slotNodes = layoutSlots.map { it.nodeStart }
+            fun rowOf(node: Int): Int = weekGridRowIndexOf(node, slotNodes)
+            fun fracOf(course: com.imsx3d.classy.data.entity.CourseEntity): Pair<Float, Float>? =
+                if (course.ownTime) com.imsx3d.classy.util.TimeTableUtils.timeToFractionalRows(
+                    course.startTime, course.endTime, layoutSlots
+                ) else null
             val sortedDays = data.visibleDays.sorted()
             val dayCount = sortedDays.size.coerceIn(1, 7)
             val todayDow = LocalDate.now().dayOfWeek.value
@@ -475,10 +534,14 @@ open class WeekGridWidgetProvider : AppWidgetProvider() {
                     for (laneRect in com.imsx3d.classy.util.ConflictLayoutEngine
                             .gridDayLanes(dayData.courses, dayData.timeJson)) {
                         val course = laneRect.course
-                        val startIdx = (course.startNode - 1).coerceAtLeast(0)
+                        val startIdx = rowOf(course.startNode)
                         val step = course.step.coerceAtLeast(1).coerceAtMost(maxNode - startIdx)
-                        val top = bodyTop + gapH + startIdx * (slotH + gapH)
-                        val barH = (slotH * step + gapH * (step - 1)).coerceAtLeast(1f)
+                        // 与常规档同一套几何（ownTime 走真实分钟比例）
+                        val (top, barH) = weekGridBlockGeom(
+                            rowIndex = startIdx, step = step,
+                            bodyTop = bodyTop, gapH = gapH.toFloat(), slotH = slotH,
+                            frac = fracOf(course)
+                        )
                         val laneX = colX + dayW * laneRect.laneStartFraction
                         val laneW = dayW * laneRect.laneWidthFraction
                         p.color = CourseColorUtil.displayFill(CourseColorUtil.pickCourseColorIntWithGroupRows(
@@ -546,12 +609,21 @@ open class WeekGridWidgetProvider : AppWidgetProvider() {
             for (dow in sortedDays) {
                 val dd = data.days.firstOrNull { it.dayOfWeek == dow } ?: continue
                 for (course in dd.courses) {
-                    val step = course.step.coerceIn(1, maxNode)
-                    val cardH = slotH * step + gapH * (step - 1)
+                    // 与下方绘制同源几何（行下标按 node 查表 + ownTime 走真实分钟），
+                    // 否则"字号预算"和"实际卡片高度"会是两张皮（BUG-3 的次生问题）。
+                    val startIdx = rowOf(course.startNode)
+                    val step = course.step.coerceAtLeast(1).coerceAtMost(maxNode - startIdx)
+                    val (_, cardH) = weekGridBlockGeom(
+                        rowIndex = startIdx, step = step,
+                        bodyTop = bodyTop, gapH = gapH.toFloat(), slotH = slotH,
+                        frac = fracOf(course)
+                    )
                     val hasRoom = course.room.isNotBlank()
                     // v22: 真实可用高度(不夹下限 → 矮卡算真实空间) + 自适应 room 预留
                     val availCardHPre = (cardH - unifiedPad * 2).coerceAtLeast(0f)
-                    val roomReservePre = if (hasRoom) (nameMinDp * 0.7f).coerceAtMost(availCardHPre * 0.35f) else 0f
+                    // BUG-5 同口径: 矮卡不预留教室带（否则课名被挤成"综合实…"）
+                    val roomReservePre = if (hasRoom && cardH >= dp(30f))
+                        (nameMinDp * 0.7f).coerceAtMost(availCardHPre * 0.35f) else 0f
                     val nameAvailH = (availCardHPre - roomReservePre).coerceAtLeast(0f)
                     // v21: token 单位高度(拉丁组旋转省空间 → unit<字数 → 统一号可能更大)
                     val tokens = tokenizeName(CourseDisplayUtil.displayName(course, useAlias))
@@ -583,11 +655,15 @@ open class WeekGridWidgetProvider : AppWidgetProvider() {
                 val laneRects = com.imsx3d.classy.util.ConflictLayoutEngine.gridDayLanes(dayData.courses, dayData.timeJson)
                 for (laneRect in laneRects) {
                     val course = laneRect.course
-                    val startIdx = (course.startNode - 1).coerceAtLeast(0)
+                    val startIdx = rowOf(course.startNode)
                     val step = course.step.coerceAtLeast(1)
                         .coerceAtMost(maxNode - startIdx)
-                    val cardTop = bodyTop + gapH + startIdx * (slotH + gapH)
-                    val cardH = slotH * step + gapH * (step - 1)
+                    // BUG-3: 与 App 同源的行/分钟映射（单一事实来源 = weekGridBlockGeom）
+                    val (cardTop, cardH) = weekGridBlockGeom(
+                        rowIndex = startIdx, step = step,
+                        bodyTop = bodyTop, gapH = gapH.toFloat(), slotH = slotH,
+                        frac = fracOf(course)
+                    )
                     // 分栏: 横向按引擎给的起点/宽度比例收缩列宽
                     val laneX = colX + dayW * laneRect.laneStartFraction
                     val laneW = dayW * laneRect.laneWidthFraction
@@ -607,7 +683,11 @@ open class WeekGridWidgetProvider : AppWidgetProvider() {
                     // The weekly bitmap follows the same fill/bar preference as the app.
                     // Keep neutral text separate from the decorative course indicator.
                     val cardColor = if (barStyle) bgSurface else baseColor
-                    val radius = dp(4f).toFloat()
+                    val radius = dp(
+                        // BUG-4: 圆角与应用内课程卡同口径 min(12dp × 用户圆角系数, 16dp)，
+                        // 旧实现写死 4dp，组件上的课块看着是"方角小条"，与应用内差一档。
+                        minOf(12f * AppPrefs.getGridCornerRatio(context), 16f)
+                    ).toFloat()
                     p.color = cardColor
                     p.alpha = 255
                     if (!barStyle) c.drawRoundRect(cardRect, radius, radius, p)
@@ -640,7 +720,10 @@ open class WeekGridWidgetProvider : AppWidgetProvider() {
                     // v20b: 用全表统一字号(unifiedCharSize), 截断逻辑保留
                     val availCardH = cardRect.height() - unifiedPad * 2
                     val hasRoom = roomChars.isNotEmpty()
-                    val roomReserveH = if (hasRoom) (nameMinDp * 0.7f).coerceAtMost(availCardH * 0.35f) else 0f
+                    // BUG-5（2026-11-20 用户报障"文字被极度压缩截断"）：卡高连「课名一行 + 教室一行」
+                    // 都放不下时，硬给教室留位置会把课名挤成"综合实…"。规则：整卡 < 30dp 就只画课名。
+                    val showRoom = hasRoom && cardRect.height() >= dp(30f)
+                    val roomReserveH = if (showRoom) (nameMinDp * 0.7f).coerceAtMost(availCardH * 0.35f) else 0f
                     val nameAvailH = (availCardH - roomReserveH).coerceAtLeast(0f)
                     val charSize = unifiedCharSize
 
@@ -669,7 +752,7 @@ open class WeekGridWidgetProvider : AppWidgetProvider() {
                     c.restore()
 
                     // 教室：卡底小字一行（真放不下才省略号）
-                    if (roomChars.isNotEmpty()) {
+                    if (showRoom) {
                         val roomStr = course.room.filter { it != '\n' && it != ' ' }
                         // UI-4f 真机实测: 0.62×/dp8 在 34dp 列宽下会把"教4502"截成"教4…"
                         // → 0.52×/dp7.5（约 6.8dp 字），完整显示教室/教师

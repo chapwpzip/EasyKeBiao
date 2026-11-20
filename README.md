@@ -35,8 +35,9 @@ Easy课表是一个**完全离线**的 Android 课表应用：直接从学校的
 
 ## 下载 / 安装
 
-- **最新安装包**：[Releases · v0.13.0-launch](https://github.com/chapwpzip/EasyKeBiao/releases/tag/v0.13.0-launch)
-  （`EasyKeBiao-v0.13.0-launch.apk`，25.59 MB，arm64-v8a / armeabi-v7a / x86 / x86_64 四 ABI 整包，`versionCode 26`）
+- **最新安装包**：[Releases · v0.13.1-widget](https://github.com/chapwpzip/EasyKeBiao/releases/tag/v0.13.1-widget)
+  （`EasyKeBiao-v0.13.1-widget.apk`，25.59 MB，arm64-v8a / armeabi-v7a / x86 / x86_64 四 ABI 整包，`versionCode 26`）
+- **演示录屏**：[docs/demo.mp4](docs/demo.mp4)（约 28 秒：课表 → 今日 → 待办/备忘 → 我的 → 外观）
 - 支持 **Android 8.0（API 26）及以上**，直接安装，无需注册账号
 - 覆盖安装即可升级，数据库会按内置迁移逐步升级，**课表不会丢**
 
@@ -45,15 +46,25 @@ Easy课表是一个**完全离线**的 Android 课表应用：直接从学校的
 
 ## 界面
 
-| 课表 | 今日 | 备忘录 / 待办 |
-| --- | --- | --- |
-| 待补充 | 待补充 | ![备忘录](docs/screenshots/02-memo.jpg) |
+> 以下截图均在 Android 12 模拟器（1080×1920）实机截取，演示数据为虚构课表与待办。
 
-| 我的 | 桌面小组件 | 应用图标（自适应） |
+| 课表 | 今日 | 待办 |
 | --- | --- | --- |
-| 待补充 | 待补充 | ![自适应图标](docs/brand/icon-adaptive.png) |
+| <img src="docs/screenshots/01-课表.png" width="250" alt="课表"> | <img src="docs/screenshots/02-今日.png" width="250" alt="今日"> | <img src="docs/screenshots/07-待办列表.png" width="250" alt="待办列表"> |
 
-> 截图会在 `docs/screenshots/` 里按 `01-schedule.jpg`、`02-memo.jpg`…… 命名，当前先放了一张实机图，其余正在补。
+| 教务直连（388 所） | 备忘 | 深色模式 |
+| --- | --- | --- |
+| <img src="docs/screenshots/05-教务取校-388所.png" width="250" alt="388 所高校名录"> | <img src="docs/screenshots/09-备忘列表.png" width="250" alt="备忘列表"> | <img src="docs/screenshots/15-深色课表.png" width="250" alt="深色课表"> |
+
+| 外观与主题 | 主题色彩 / 深浅色 | 我的 |
+| --- | --- | --- |
+| <img src="docs/screenshots/11-外观与主题.png" width="250" alt="外观与主题"> | <img src="docs/screenshots/12-主题色彩与深浅色.png" width="250" alt="主题色与深浅色"> | <img src="docs/screenshots/10-我的.png" width="250" alt="我的"> |
+
+| 桌面小组件页 | 添加小组件 | 桌面上的待办组件 |
+| --- | --- | --- |
+| <img src="docs/screenshots/13-桌面小组件.png" width="250" alt="小组件页"> | <img src="docs/screenshots/14-添加小组件.png" width="250" alt="添加小组件"> | <img src="docs/screenshots/17-桌面待办组件.png" width="420" alt="桌面待办组件"> |
+
+更多截图在 [`docs/screenshots/`](docs/screenshots)；应用图标见 [`docs/brand/`](docs/brand)。
 
 ## 功能
 
@@ -140,7 +151,7 @@ Easy课表是一个**完全离线**的 Android 课表应用：直接从学校的
 | 网络与解析 | 内置 WebView 抓取 + Jsoup 解析，按学校协议适配 |
 | 图片与图形 | Coil、Canvas 自绘（礼花、组件位图）、`kyant0/backdrop` 真模糊玻璃 |
 | 组件 | AppWidget（RemoteViews 位图与行列表两套渲染） |
-| 测试 | JUnit4 + 契约测试（269 suites / 2366 tests），含数据库迁移、路由完整性、组件 XML 契约、学校数据一致性 |
+| 测试 | JUnit4 + 契约测试（270 suites / 2374 tests），含数据库迁移、路由完整性、组件 XML 契约、组件几何一致性、学校数据一致性 |
 
 最低 Android 8.0（API 26），目标 API 37。
 
@@ -196,6 +207,7 @@ tools/               # 构建期辅助脚本（图标生成等）
 7. **品牌与图标**：应用名、图标、导出格式标记、分享文案全部换成 Easy课表；图标由脚本生成（像素/矢量混合绘制）。
 8. **教务扩量**：学校库 350 → 388 所，新增基于**响应正文厂商特征**的协议判型与兜底页对照探测（见 `tools/`）。
 9. **设置增强**：启动直达页面（可选落到课表 / 今日 / 课表管理 / 备忘录 / 我的）。
+10. **组件几何对齐**：本周组件的行号/行高改为与 App 内同一套查表函数，修复「组件与应用课表对不上」；矮卡不再预留教室行，避免课名被压成「综合实…」。
 
 ## 参考项目与致谢
 

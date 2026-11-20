@@ -30,7 +30,7 @@ android {
         // 0.12.0-schools = 教务导入学校 350 → 388（582 所官网探测 + 正文证据判型）
         // 0.13.0-launch = 设置 → 通用新增「启动直达页面」
         versionCode = 26
-        versionName = "0.13.0-launch"
+        versionName = "0.13.1-widget"
         vectorDrawables { useSupportLibrary = true }
         androidResources {
             localeFilters += listOf("zh-rCN", "en")

@@ -1,6 +1,6 @@
 {
   "versionCode": 26,
-  "versionName": "0.13.0-launch",
+  "versionName": "0.13.1-widget",
   "notes": {
     "zh": [
       "新增「启动直达页面」：设置 → 通用里能选打开应用先落到哪一页（课表 / 今日 / 课表管理 / 备忘录 / 我的）。",
@@ -14,5 +14,19 @@
       "The default is still Schedule, matching previous behaviour, and \"Reset all settings\" restores it.",
       "School presets remain at 388 from the previous release."
     ]
-  }
+  },
+  "zh": [
+    "周视图组件与应用内课表对齐：行数按课表全部节次渲染，13 节课表不再少画最后一节",
+    "课程块按节次号查表定位，删过节次的课表也不再整列错位",
+    "非常规时间的课按真实分钟比例摆放，起点与高度和应用内一致",
+    "课程卡圆角改用与应用内同一个设置（不再写死 4dp）",
+    "卡片太矮时不再给教室留位置，课名不再被挤成“综合实…”"
+  ],
+  "en": [
+    "Week widget now shares the in-app geometry: rows follow the whole period table, so a 13-period week no longer loses its last row",
+    "Courses are placed by looking up their period node instead of subtracting one, so tables with deleted periods stay aligned",
+    "Irregular-time courses use real-minute fractions, matching their start and height in the app",
+    "Course cards take the same corner radius as the in-app grid instead of a hardcoded 4dp",
+    "Short cards no longer reserve a room line, so the course name is not squeezed into an ellipsis"
+  ]
 }
