@@ -1,6 +1,6 @@
 # Easy课表 · 大学课程表与待办
 
-> 课表 / 课程表 / 大学课程表 / 高校课表 / 教务系统一键导入 / 待办清单 / 桌面小组件 / Android 课表 App / Timetable &amp; Class Schedule
+> 课表 / 课程表 / 大学课程表 / 高校课表 / 教务系统一键导入 / 桂林旅游学院 / GLTU / 待办清单 / 桌面小组件 / Android 课表 App / Timetable &amp; Class Schedule
 
 <p align="center">
   <img src="docs/brand/icon-512.png" width="168" alt="Easy课表图标：白猫与黄色笔记本">
@@ -125,6 +125,8 @@ Easy课表是一个**完全离线**的 Android 课表应用：直接从学校的
 - 研究生系统（`xju_post` 等）单独标记状态
 
 列表支持按拼音首字母/全拼检索与分组，未适配学校可提交"申请适配"。
+
+**桂林旅游学院（GLTU）** 在名录内的例子：名称「桂林旅游学院」，入口 `v.gltu.edu.cn`（正方 `zf_new`），检索别名含 `gltu`、`桂林旅院`、`guilinlvyouxueyuan`——在「教务导入」里输入 `gltu` 或「桂林」都能直接命中，登录教务后一键抓完整学期课表（本文档里的课表示例就来自该校 12 门课程）。
 
 ### 三、今日
 
