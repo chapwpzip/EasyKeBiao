@@ -5,7 +5,7 @@
        · 不会因为组件尺寸变化被拉伸/压扁（无位图缩放）
        · 名字长不会退化成单字截断，最多两行后省略
        · 内容超出可视区由 launcher 原生滚动查看（真正的集合型组件）
-     @see com.imsx3d.classy.widget.CourseRowWidgetService -->
+     @see com.easykebiao.app.widget.CourseRowWidgetService -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_row_root"
     android:layout_width="match_parent"

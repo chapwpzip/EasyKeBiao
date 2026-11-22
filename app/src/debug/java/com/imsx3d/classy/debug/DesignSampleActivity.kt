@@ -1,4 +1,4 @@
-package com.imsx3d.classy.debug
+package com.easykebiao.app.debug
 
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
@@ -12,12 +12,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.imsx3d.classy.data.entity.CourseEntity
-import com.imsx3d.classy.ui.screen.mine.ControlGalleryScreen
-import com.imsx3d.classy.ui.screen.mine.GeneralSettingsScreen
-import com.imsx3d.classy.ui.screen.today.TodayContent
-import com.imsx3d.classy.ui.theme.SleepyThemeProvider
-import com.imsx3d.classy.util.DateUtils
+import com.easykebiao.app.data.entity.CourseEntity
+import com.easykebiao.app.ui.screen.mine.ControlGalleryScreen
+import com.easykebiao.app.ui.screen.mine.GeneralSettingsScreen
+import com.easykebiao.app.ui.screen.today.TodayContent
+import com.easykebiao.app.ui.theme.SleepyThemeProvider
+import com.easykebiao.app.util.DateUtils
 import java.time.LocalDateTime
 
 /** Debug-only deterministic visual fixture. Never writes sample courses to the database. */
@@ -52,7 +52,7 @@ class DesignSampleActivity : ComponentActivity() {
                                 text = { Text("${course.startTime}–${course.endTime}\n${course.room}") },
                                 confirmButton = {
                                     androidx.compose.material3.TextButton(onClick = { selected = null }) {
-                                        Text(getString(com.imsx3d.classy.R.string.ok))
+                                        Text(getString(com.easykebiao.app.R.string.ok))
                                     }
                                 }
                             )

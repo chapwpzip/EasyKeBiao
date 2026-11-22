@@ -1,4 +1,4 @@
-package com.imsx3d.classy.debug
+package com.easykebiao.app.debug
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -31,10 +31,10 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.imsx3d.classy.R
-import com.imsx3d.classy.ui.component.*
-import com.imsx3d.classy.ui.theme.DockMaterialPolicy
-import com.imsx3d.classy.ui.theme.SleepyThemeProvider
+import com.easykebiao.app.R
+import com.easykebiao.app.ui.component.*
+import com.easykebiao.app.ui.theme.DockMaterialPolicy
+import com.easykebiao.app.ui.theme.SleepyThemeProvider
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawPlainBackdrop

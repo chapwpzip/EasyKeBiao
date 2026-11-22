@@ -301,7 +301,7 @@ vivo PA2553 API36、401G5705710000H：连接途中短暂断开后恢复；新版
 
 ## BRAND-02（2026-10-13）
 
-brand-wordmark-build.log：Debug/Release/AndroidTest构建成功；窄屏与宽屏ClassyBrandCardTest各3项通过（brand-wordmark-tests.txt、brand-wordmark-wide-tests.txt），含按压像素变化、松手/Cancel复位、滚动与信件开合。模拟器English/1.5字号，测试后恢复540×960/240dpi。vivo正式版安装成功，关于页中文排版截图已核对：stage2-vivo-phone-device/brand-wordmark-phone.png、brand-wordmark-phone-crop.png。真实平板和暗色整页仍未补验；没有本批性能提升结论。
+brand-wordmark-build.log：Debug/Release/AndroidTest构建成功；窄屏与宽屏AppBrandCardTest各3项通过（brand-wordmark-tests.txt、brand-wordmark-wide-tests.txt），含按压像素变化、松手/Cancel复位、滚动与信件开合。模拟器English/1.5字号，测试后恢复540×960/240dpi。vivo正式版安装成功，关于页中文排版截图已核对：stage2-vivo-phone-device/brand-wordmark-phone.png、brand-wordmark-phone-crop.png。真实平板和暗色整页仍未补验；没有本批性能提升结论。
 
 ## HEADER-03（2026-10-13）
 

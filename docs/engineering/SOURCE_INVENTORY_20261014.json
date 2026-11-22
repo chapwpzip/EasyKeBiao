@@ -37,7 +37,7 @@
       "review": "See CODE_AUDIT_20261014.md; inventory is not acceptance"
     },
     {
-      "path": "app/src/androidTest/java/com/imsx3d/classy/ui/ClassyBrandCardTest.kt",
+      "path": "app/src/androidTest/java/com/imsx3d/classy/ui/AppBrandCardTest.kt",
       "kind": ".kt",
       "review": "See CODE_AUDIT_20261014.md; inventory is not acceptance"
     },
@@ -722,7 +722,7 @@
       "review": "See CODE_AUDIT_20261014.md; inventory is not acceptance"
     },
     {
-      "path": "app/src/main/java/com/imsx3d/classy/ui/component/ClassyBrandCard.kt",
+      "path": "app/src/main/java/com/imsx3d/classy/ui/component/AppBrandCard.kt",
       "kind": ".kt",
       "review": "See CODE_AUDIT_20261014.md; inventory is not acceptance"
     },
@@ -1192,7 +1192,7 @@
       "review": "See CODE_AUDIT_20261014.md; inventory is not acceptance"
     },
     {
-      "path": "app/src/main/java/com/imsx3d/classy/ui/theme/ClassyLayout.kt",
+      "path": "app/src/main/java/com/imsx3d/classy/ui/theme/AppLayout.kt",
       "kind": ".kt",
       "review": "See CODE_AUDIT_20261014.md; inventory is not acceptance"
     },

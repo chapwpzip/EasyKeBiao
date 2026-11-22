@@ -1,4 +1,4 @@
-package com.imsx3d.classy.debug
+package com.easykebiao.app.debug
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity

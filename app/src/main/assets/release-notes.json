@@ -1,32 +1,20 @@
 {
-  "versionCode": 26,
-  "versionName": "0.13.1-widget",
+  "versionCode": 31,
+  "versionName": "1.0.1",
   "notes": {
     "zh": [
-      "新增「启动直达页面」：设置 → 通用里能选打开应用先落到哪一页（课表 / 今日 / 课表管理 / 备忘录 / 我的）。",
-      "当前选项就显示在这一行的标题上，点开是单选列表，选完即时保存，下次冷启动直接到位。",
-      "出厂默认仍是课表，与旧版行为一致；「恢复默认设置」会把它一起还原。",
-      "教务导入的学校仍是 388 所（上一版扩量）。"
+      "软件更名为独立发行身份，安装包标识与自有命名空间统一为 com.easykebiao.app",
+      "重要：本次更换了应用标识，新版本会作为独立应用安装，旧版本的课表与待办不会自动迁移，请先导出 .ics 再导入",
+      "待办与备忘共用日程式填写页：一句话识别填写、分类、截止与时间、地点、优先级",
+      "待办支持附图，列表与桌面小组件都显示缩略图",
+      "天气提醒、AI 整理、桌面小组件与深色模式等既有功能保持不变"
     ],
     "en": [
-      "New \"Launch page\": under Settings → General, pick which tab the app opens on (Schedule / Today / Manage / Memo / Mine).",
-      "The current choice is shown as the row title; tapping opens a single-choice list that saves immediately and applies on the next cold start.",
-      "The default is still Schedule, matching previous behaviour, and \"Reset all settings\" restores it.",
-      "School presets remain at 388 from the previous release."
+      "Independent release identity: package id and namespace are now com.easykebiao.app",
+      "Important: the app id changed, so this version installs as a separate app. Export your schedule to .ics and import it again after installing",
+      "Task and memo editors share a schedule-style form: one-line auto fill, category, due date and time, place, priority",
+      "Tasks support a photo, shown as a thumbnail in the list and in the home-screen widget",
+      "Weather alerts, AI cleanup, widgets and dark mode are unchanged"
     ]
-  },
-  "zh": [
-    "周视图组件与应用内课表对齐：行数按课表全部节次渲染，13 节课表不再少画最后一节",
-    "课程块按节次号查表定位，删过节次的课表也不再整列错位",
-    "非常规时间的课按真实分钟比例摆放，起点与高度和应用内一致",
-    "课程卡圆角改用与应用内同一个设置（不再写死 4dp）",
-    "卡片太矮时不再给教室留位置，课名不再被挤成“综合实…”"
-  ],
-  "en": [
-    "Week widget now shares the in-app geometry: rows follow the whole period table, so a 13-period week no longer loses its last row",
-    "Courses are placed by looking up their period node instead of subtracting one, so tables with deleted periods stay aligned",
-    "Irregular-time courses use real-minute fractions, matching their start and height in the app",
-    "Course cards take the same corner radius as the in-app grid instead of a hardcoded 4dp",
-    "Short cards no longer reserve a room line, so the course name is not squeezed into an ellipsis"
-  ]
+  }
 }

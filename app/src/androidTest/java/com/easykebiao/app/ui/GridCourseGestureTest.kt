@@ -1,0 +1,134 @@
+package com.easykebiao.app.ui
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.unit.dp
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import com.easykebiao.app.R
+import com.easykebiao.app.data.entity.CourseEntity
+import com.easykebiao.app.ui.component.CardsGridView
+import com.easykebiao.app.ui.component.TimeSlot
+import com.easykebiao.app.util.GridSelection
+import com.easykebiao.app.util.TimeTableUtils
+import java.time.LocalTime
+import org.junit.Rule
+import org.junit.Test
+import org.junit.Assert.*
+import org.junit.runner.RunWith
+
+@RunWith(AndroidJUnit4::class)
+class GridCourseGestureTest {
+    @get:Rule val compose = createComposeRule()
+    private val slots = (1..6).map { node ->
+        val start = LocalTime.of(8 + node, 0)
+        TimeSlot("$node", start, start.plusMinutes(45), start.toString(), start.plusMinutes(45).toString(), node, node)
+    }
+    private fun nodeLabel(node: Int) = InstrumentationRegistry.getInstrumentation()
+        .targetContext.getString(R.string.period_format_node, node.toString())
+    @Test fun largeFontPeriodAxisKeepsNumberAndTimesReadable() {
+        compose.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density.density, 1.5f)
+            ) {
+                MaterialTheme {
+                    Box(Modifier.width(350.dp).height(620.dp)) {
+                        CardsGridView(emptyList(), timeSlots = slots.map { it.copy(label = "12") }.take(1),
+                            timeJson = TimeTableUtils.DEFAULT_TIME_JSON, visibleDays = (1..7).toSet(), onCourseClick = {})
+                    }
+                }
+            }
+        }
+        for (text in listOf("12", "09:00", "09:45")) {
+            val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            compose.onNodeWithText(text, useUnmergedTree = true).assertIsDisplayed()
+                .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(results) }
+            assertFalse("axis text clipped: $text size=${results.single().size} vertical=${results.single().didOverflowHeight} horizontal=${results.single().didOverflowWidth} line=${results.single().getLineBottom(0)}", results.single().hasVisualOverflow)
+        }
+    }
+
+    @Test fun emptyGridClickResizeAndConfirmPrefillsSelectedRange() {
+        var added: GridSelection? = null
+        compose.setContent {
+            MaterialTheme {
+                Box(Modifier.width(350.dp).height(620.dp).testTag("grid")) {
+                    CardsGridView(emptyList(), timeSlots = slots, timeJson = TimeTableUtils.DEFAULT_TIME_JSON, visibleDays = setOf(1, 2, 3),
+                        onCourseClick = {}, onQuickAdd = { added = it })
+                }
+            }
+        }
+        // Derive coordinates from actual visible time labels, independent of density/row scaling.
+        val third = compose.onNodeWithContentDescription(nodeLabel(3), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val fifth = compose.onNodeWithContentDescription(nodeLabel(5), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val bounds = compose.onNodeWithTag("grid").fetchSemanticsNode().boundsInRoot
+        val x = bounds.width * .22f
+        compose.onNodeWithTag("grid").performTouchInput { click(Offset(x, third.center.y - bounds.top)) }
+        compose.onNodeWithContentDescription("新增课程，第 3–3 节").assertExists()
+        compose.onNodeWithContentDescription("新增课程，第 3–3 节").performTouchInput {
+            down(Offset(center.x, height * .75f))
+            moveBy(Offset(0f, fifth.center.y - third.center.y), 500)
+            up()
+        }
+        compose.onNodeWithContentDescription("新增课程，第 3–5 节").performClick()
+        compose.runOnIdle { assertEquals(GridSelection(1, 3, 5), added) }
+    }
+    @Test fun cardLongPressDragRequestsMoveWithoutOpeningDetails() {
+        val course = CourseEntity(id = 4, groupId = "g", tableId = 1, courseName = "Drag me",
+            day = 1, startNode = 1, step = 1, startWeek = 1, endWeek = 16, color = "#123456")
+        var clicked = false
+        var target: GridSelection? = null
+        compose.setContent {
+            MaterialTheme {
+                Box(Modifier.width(350.dp).height(620.dp)) {
+                    CardsGridView(listOf(course), timeSlots = slots, timeJson = TimeTableUtils.DEFAULT_TIME_JSON, visibleDays = setOf(1, 2, 3),
+                        onCourseClick = { clicked = true }, onMoveCourse = { _, selected -> target = selected })
+                }
+            }
+        }
+        val first = compose.onNodeWithContentDescription(nodeLabel(1), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val third = compose.onNodeWithContentDescription(nodeLabel(3), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithText("Drag me", useUnmergedTree = true).performTouchInput {
+            down(center)
+            advanceEventTime(800)
+            moveBy(Offset(0f, third.center.y - first.center.y), 300)
+            up()
+        }
+        compose.runOnIdle { assertFalse(clicked); assertEquals(GridSelection(1, 3, 3), target) }
+    }
+    @Test fun conflictingCourseDragCancelDoesNotMoveOrOpenDetails() {
+        val first = CourseEntity(id = 98001, groupId = "cancel-a", tableId = 98000,
+            courseName = "Cancel drag", day = 1, startNode = 1, step = 2,
+            startWeek = 1, endWeek = 16, color = "#123456")
+        val second = first.copy(id = 98002, groupId = "cancel-b", courseName = "Underlying", step = 1)
+        var opens = 0
+        var moves = 0
+        compose.setContent { MaterialTheme {
+            Box(Modifier.width(350.dp).height(620.dp)) {
+                CardsGridView(listOf(first, second), timeSlots = slots,
+                    timeJson = TimeTableUtils.DEFAULT_TIME_JSON, visibleDays = setOf(1, 2, 3),
+                    onCourseClick = { opens++ }, onMoveCourse = { _, _ -> moves++ })
+            }
+        } }
+        val card = compose.onNodeWithText("Cancel drag", useUnmergedTree = true)
+        val firstBounds = card.fetchSemanticsNode().boundsInRoot
+        card.performTouchInput {
+            down(center)
+            advanceEventTime(800)
+            moveBy(Offset(0f, 100f), 300)
+            cancel()
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals(0, opens); assertEquals(0, moves) }
+        assertEquals(firstBounds, card.fetchSemanticsNode().boundsInRoot)
+        card.performTouchInput { click(center) }
+        compose.runOnIdle { assertEquals(1, opens); assertEquals(0, moves) }
+    }
+
+}

@@ -36,7 +36,7 @@
 
 ### 自动回归与产物
 
-- 本轮补验22项全部通过：WidgetCardGeometryTest、BackgroundAdjustmentsTest、ClassyBrandCardTest、JwRefreshRepositoryTest、LiveNotificationEligibilityTest的vendorMetadataPreservesStandardLiveRequest。日志round3-targeted-checks.txt。
+- 本轮补验22项全部通过：WidgetCardGeometryTest、BackgroundAdjustmentsTest、AppBrandCardTest、JwRefreshRepositoryTest、LiveNotificationEligibilityTest的vendorMetadataPreservesStandardLiveRequest。日志round3-targeted-checks.txt。
 - 通知测试只检查标准请求/厂商元数据，不发布通知，不证明原子岛外观或长期送达。教务仓库测试使用内存数据库，覆盖保留作息、本地修改保护、重复刷新和过期提交拒绝；学校真实登录沿用已有24条课程刷新实测，本轮未再次使用学校账号。
 - 上一轮同一应用行为基线2339项JVM、23项流程通过；本轮没有把它们写成又完整重跑了一次。无新应用代码，无重复构建。
 - ARM64交付APK与x86_64验收APK均通过apksigner签名验证。ABI不同，模拟器通过不等同ARM64 Release实体手机通过；平板使用隔离Debug包。

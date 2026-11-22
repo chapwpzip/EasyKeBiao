@@ -1,0 +1,254 @@
+package com.easykebiao.app.ui.screen.manage
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.widthIn
+import com.easykebiao.app.ui.theme.AppLayout
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Class
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.easykebiao.app.R
+import com.easykebiao.app.ui.screen.imports.ImportDraft
+import com.easykebiao.app.ui.screen.imports.ImportSheet
+import com.easykebiao.app.ui.screen.schedule.ScheduleViewModel
+import com.easykebiao.app.ui.theme.SleepyTheme
+import com.easykebiao.app.ui.component.settingsCard
+import com.easykebiao.app.ui.theme.noRippleClickable
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ManagementPage(
+    onJwImportRequested: () -> Unit,
+    onCreateNewTableRequested: () -> Unit,
+    onOpenPeriodTables: () -> Unit = {},
+    onOpenCourseList: () -> Unit = {},
+    onEditCurrentTable: () -> Unit,
+    onExportRequested: () -> Unit = {},
+    onOpenAllTables: () -> Unit = {},
+    onImported: () -> Unit,
+    drafts: List<ImportDraft> = emptyList(),
+    onRestoreDraft: (String) -> Unit = {},
+    onDeleteDraft: suspend (String) -> Unit = {},
+    viewModel: ScheduleViewModel = viewModel(),
+    autoShowImportSheet: Boolean = false,
+    onAutoShowImportHandled: () -> Unit = {}
+) {
+    val state by viewModel.state.collectAsState()
+    val colors = MaterialTheme.colorScheme
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val table = state.currentTable
+
+    var showImportSheet by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(autoShowImportSheet) {
+        if (autoShowImportSheet) {
+            showImportSheet = true
+            onAutoShowImportHandled()
+        }
+    }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.background),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        // Dock 悬浮底栏: 滚动尾部多留 Dock 总高(FAB 语义, 同今日/我的页)
+        // contentPadding(非 Modifier.padding): 内容能滚到屏幕边缘自然滑出, 禁列表整体内缩硬裁
+        val navExtra = com.easykebiao.app.ui.component.LocalNavExtraBottomPadding.current
+        LazyColumn(
+            modifier = Modifier.widthIn(max = AppLayout.readingWidth).fillMaxSize(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp + navExtra
+            ),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // UI-7a: 大标题统一 —— 与「我的」「通用」同一套 32sp largeTitleEmphasized
+            //（原来是 headlineMedium ~28sp，三个页面各写各的，摆一起像不同 App）
+            item {
+                Text(
+                    text = stringResource(R.string.tab_manage),
+                    style = com.nevoit.glasense.theme.GlasenseTheme.type.largeTitleEmphasized,
+                    color = com.nevoit.glasense.theme.GlasenseTheme.colors.content
+                )
+            }
+
+            // 当前课表摘要
+            // 2026-09-21 用户令: 点当前课表大卡 → 跳「所有课表」页(最符合直觉)
+            item {
+                if (table != null) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .settingsCard(colors.surfaceContainer)
+                            .noRippleClickable(onOpenAllTables)
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = stringResource(R.string.manage_current_table),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = colors.primary,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = stringResource(R.string.manage_view_all_tables),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = colors.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            text = table.name,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = colors.onSurface
+                        )
+                        Text(
+                            // 口径统一(2026-09-21): 此处数字 = 上课安排数(时间×节次×周组合), 非课程门数
+                            text = stringResource(R.string.table_info, table.startDate, state.currentWeek, state.courses.count { it.tableId == table.id }),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (table != null) {
+                        ManageCard(
+                            icon = Icons.Outlined.Class,
+                            title = stringResource(R.string.course_list_title),
+                            subtitle = stringResource(R.string.course_list_subtitle),
+                            onClick = onOpenCourseList
+                        )
+                        ManageCard(
+                            icon = Icons.Outlined.Refresh,
+                            title = stringResource(R.string.schedule_refresh_school),
+                            subtitle = stringResource(R.string.jw_refresh_short),
+                            onClick = {
+                                context.startActivity(android.content.Intent(context,
+                                    com.easykebiao.app.ui.screen.imports.JwImportActivity::class.java)
+                                    .putExtra(com.easykebiao.app.ui.screen.imports.JwImportActivity.EXTRA_REFRESH_TABLE_ID, table.id))
+                            }
+                        )
+                        ManageCard(
+                            icon = Icons.Outlined.Edit,
+                            title = stringResource(R.string.manage_edit_current),
+                            subtitle = stringResource(R.string.manage_edit_current_sub),
+                            onClick = onEditCurrentTable
+                        )
+                    }
+                    ManageCard(
+                        icon = Icons.Outlined.Schedule,
+                        title = stringResource(R.string.mine_period_tables),
+                        subtitle = stringResource(R.string.manage_period_tables_sub),
+                        onClick = onOpenPeriodTables
+                    )
+                    ManageCard(
+                        icon = Icons.Outlined.FileUpload,
+                        title = stringResource(R.string.manage_import),
+                        subtitle = stringResource(R.string.manage_import_sub),
+                        onClick = { showImportSheet = true }
+                    )
+                    if (table == null) {
+                        ManageCard(
+                            icon = Icons.Outlined.AutoAwesome,
+                            title = stringResource(R.string.manage_new_table),
+                            subtitle = stringResource(R.string.manage_new_table_sub),
+                            onClick = onCreateNewTableRequested
+                        )
+                    }
+                    ManageCard(
+                        icon = Icons.Outlined.Share,
+                        title = stringResource(R.string.manage_export),
+                        subtitle = stringResource(R.string.manage_export_sub),
+                        onClick = onExportRequested
+                    )
+                }
+            }
+        }
+    }
+
+    if (showImportSheet) {
+        ImportSheet(
+            sheetState = sheetState,
+            onDismiss = { showImportSheet = false },
+            onJwImportRequested = {
+                showImportSheet = false
+                onJwImportRequested()
+            },
+            onImported = onImported,
+            drafts = drafts,
+            onRestoreDraft = onRestoreDraft,
+            onDeleteDraft = onDeleteDraft,
+            viewModel = viewModel
+        )
+    }
+}
+
+@Composable
+private fun ManageCard(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .settingsCard(colors.surfaceContainer)
+            .noRippleClickable(onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(SleepyTheme.shapes.medium)
+                .background(colors.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = colors.onPrimaryContainer, modifier = Modifier.size(22.dp))
+        }
+        Column(modifier = Modifier.weight(1f).padding(start = 14.dp)) {
+            Text(title, style = MaterialTheme.typography.labelLarge, color = colors.onSurface)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+        }
+    }
+}

@@ -30,7 +30,7 @@
             android:theme="@android:style/Theme.NoDisplay" />
 
         <receiver
-            android:name="com.imsx3d.classy.debug.DebugScheduleReceiver"
+            android:name="com.easykebiao.app.debug.DebugScheduleReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="${applicationId}.debug.SCHEDULE_NOW" />

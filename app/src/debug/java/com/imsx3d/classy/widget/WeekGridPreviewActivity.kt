@@ -1,4 +1,4 @@
-package com.imsx3d.classy.widget
+package com.easykebiao.app.widget
 
 import android.os.Bundle
 import android.util.Log
@@ -22,14 +22,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.imsx3d.classy.SleepyApp
-import com.imsx3d.classy.data.entity.CourseEntity
-import com.imsx3d.classy.ui.component.CardsGridView
-import com.imsx3d.classy.ui.component.TimeSlot
-import com.imsx3d.classy.ui.theme.SleepyTheme
-import com.imsx3d.classy.util.AppPrefs
-import com.imsx3d.classy.util.DateUtils
-import com.imsx3d.classy.util.TimeTableUtils
+import com.easykebiao.app.SleepyApp
+import com.easykebiao.app.data.entity.CourseEntity
+import com.easykebiao.app.ui.component.CardsGridView
+import com.easykebiao.app.ui.component.TimeSlot
+import com.easykebiao.app.ui.theme.SleepyTheme
+import com.easykebiao.app.util.AppPrefs
+import com.easykebiao.app.util.DateUtils
+import com.easykebiao.app.util.TimeTableUtils
 import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -59,11 +59,11 @@ class WeekGridPreviewActivity : ComponentActivity() {
             // 跟随 app 主题设置(此前全默认参=永远浅色+默认紫)
             val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
             val dark = androidx.compose.runtime.remember(systemDark) {
-                com.imsx3d.classy.util.AppPrefs.isDarkMode(this@WeekGridPreviewActivity, systemDark)
+                com.easykebiao.app.util.AppPrefs.isDarkMode(this@WeekGridPreviewActivity, systemDark)
             }
             val themeKey by AppPrefs.themeKeyFlow(this@WeekGridPreviewActivity)
                 .collectAsState(initial = AppPrefs.getThemeKey(this@WeekGridPreviewActivity))
-            com.imsx3d.classy.ui.theme.SleepyThemeProvider(darkTheme = dark, themeKey = themeKey) {
+            com.easykebiao.app.ui.theme.SleepyThemeProvider(darkTheme = dark, themeKey = themeKey) {
                 AppScheduleScreen()
             }
         }
@@ -118,7 +118,7 @@ class WeekGridPreviewActivity : ComponentActivity() {
 
 private data class ScreenData(
     val courses: List<CourseEntity>,
-    val timeSlots: List<com.imsx3d.classy.ui.component.TimeSlot>,
+    val timeSlots: List<com.easykebiao.app.ui.component.TimeSlot>,
     val visibleDays: Set<Int>,
     val startDate: String,
     val currentWeek: Int,

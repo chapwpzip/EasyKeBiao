@@ -27,7 +27,7 @@
 - 色彩继续由 Glasense → `GlasenseColorBridge` 映射到 Material；没有新增调色板。
 - 普通卡面读取 cardBackground / surfaceContainer；普通卡形统一 Glasense cardShape。浮层继续读取已有 elevatedCardBackground / Material 高层表面。
 - 字体复用现有 Glasense 与 Material 映射；课程色只负责识别，时间用中性文字。
-- `ClassyLayout` 只维护尺寸：页面边距 16dp、项目间距 12dp、组间距 16dp、阅读容器 720dp、触摸目标 48dp，不复制主题颜色或形状。
+- `AppLayout` 只维护尺寸：页面边距 16dp、项目间距 12dp、组间距 16dp、阅读容器 720dp、触摸目标 48dp，不复制主题颜色或形状。
 - 通用设置率先使用 SettingsScaffold 的阅读宽度参数。其他设置页保留原宽度，P2 逐页迁移；公共卡形、返回命中区域和点击反馈已共享生效。
 - 页面容器负责底色、阅读宽度；TodayContent 负责内容列表；未来背景是页面底层职责，本批未接图片或玻璃。
 - 今日的冲突引擎、课程过滤、时间计算与变淡规则保持原有逻辑；窄屏仍明确显示“冲突课程”。详情继续使用生产 CourseDetailSheet。

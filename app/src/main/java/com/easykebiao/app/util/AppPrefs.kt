@@ -1,0 +1,1009 @@
+package com.easykebiao.app.util
+
+import android.content.Context
+import android.content.SharedPreferences
+import android.content.res.Configuration
+import androidx.core.content.edit
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+
+/**
+ * App 级别轻量设置 — 避免引入 DataStore 依赖。
+ * 进程内 mutableStateOf 同步给 UI，磁盘做持久化。
+ * 默认值以 docs/engineering/DEFAULT_SETTINGS_20261014.md 的手机配置为准。
+ * 首次安装与 resetSettings 清除偏好后使用同一组 getter 默认值；勿另建重置专用参数。
+ */
+object AppPrefs {
+    private const val FILE = "sleepy_prefs"
+
+    /**
+     * 全局 prefs key 变化广播 — UI 用它主动 recompose 而非依赖 SharedPreferences 监听器
+     * (主视图在 Compose 里读 prefs, 没显式订阅者就感知不到 change)
+     */
+    private val _changeBus = MutableSharedFlow<String>(
+        replay = 1,
+        extraBufferCapacity = 16,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val changeBus: Flow<String> = _changeBus.asSharedFlow()
+    // Compose consumers subscribe while reading display values. Recomposition cannot rely
+    // on an unrelated timer or a parent whose unchanged children may be skipped.
+    private val displayRevision = androidx.compose.runtime.mutableIntStateOf(0)
+    @Synchronized
+    private fun notifyChanged(key: String) {
+        displayRevision.intValue++
+        _changeBus.tryEmit(key)
+    }
+    private inline fun <T> displayValue(read: () -> T): T {
+        displayRevision.intValue
+        return read()
+    }
+    const val KEY_DARK = "dark_mode"
+    const val KEY_REMINDER = "reminder_master"      // master toggle (default false)
+    const val KEY_DAILY_ENABLED = "daily_reminder"   // daily sub-toggle (default false)
+    const val KEY_DAILY_TIME = "daily_reminder_time" // "HH:mm" default "07:00"
+    const val KEY_TOMORROW_REMINDER_ENABLED = "tomorrow_reminder" // bool default true; master remains off
+    const val KEY_TOMORROW_REMINDER_TIME = "tomorrow_reminder_time" // "HH:mm" default "22:00"
+    const val KEY_TODAY_REMINDER_ENABLED = "today_reminder" // bool default true
+    const val DEFAULT_TODAY_REMINDER_ENABLED = true
+    const val DEFAULT_TOMORROW_REMINDER_ENABLED = true
+    const val DEFAULT_TOMORROW_REMINDER_TIME = "22:00"
+    const val KEY_BEFORE_CLASS_ENABLED = "before_class_enabled"       // bool default true; master remains off
+    const val KEY_BEFORE_CLASS_MINUTES = "before_class_minutes"       // int default 5
+    const val KEY_BEFORE_CLASS_BANNER = "before_class_banner"         // bool default true
+    const val KEY_BEFORE_CLASS_FLUID = "before_class_fluid"            // bool default true; master remains off
+    const val KEY_BEFORE_CLASS_FLUID_FIELDS = "before_class_fluid_fields" // legacy multi-select
+    const val KEY_BEFORE_CLASS_FLUID_PRIMARY = "before_class_fluid_primary" // name/time/room
+    const val KEY_THEME = "theme_key"
+    const val KEY_LANG = "language"
+    const val KEY_DISPLAY_MODE = "display_mode" // "node" or "time" — 出厂默认 "time" (用户 2026-09-14: 默认显示时间段)
+    const val KEY_GRID_SUB_INFO = "grid_sub_info" // "room" / "teacher" / "none" — 网格卡片副信息（周视图网格卡课程名下方那行；左栏已有节次，故此处不再显示节次/时间）
+    const val KEY_CONFLICT_STYLE = "conflict_style" // "stack" / "fold" / "rail" — 冲突课程显示样式（网格视图同格冲突时；stack=叠层偏移, fold=折角揭示, rail=侧边竖轨, 默认 "rail"）
+    const val KEY_CONFLICT_TOP_INSET = "conflict_top_inset" // Float dp — [已拆分停写] 旧共用值: A=右/下偏移 d, C=右缘让宽; 读取仅作迁移源
+    val CONFLICT_TOP_INSET_RANGE = 4f..20f        // 滑杆量程(dp) — 叠层/竖轨两滑杆共用同一量程
+    const val CONFLICT_TOP_INSET_DEFAULT = 7f     // 默认(dp) — 用户实测定版
+    const val KEY_CONFLICT_STACK_INSET = "conflict_stack_inset" // Float dp — 叠层偏移量(STACK 专有, 用户 2026-09-04 拆分: 两样式独立配置不共享)
+    const val KEY_CONFLICT_RAIL_INSET = "conflict_rail_inset"   // Float dp — 右缘让宽(RAIL 专有, 同上)
+    const val KEY_CONFLICT_FOLD_SIZE = "conflict_fold_size" // Float dp — 折角幅度(fold 样式): 折痕直角边长, 视觉符号与命中区共用; 默认 16dp = 旧硬编码值
+    val CONFLICT_FOLD_SIZE_RANGE = 8f..28f        // 拖杆量程(dp)
+    const val CONFLICT_FOLD_SIZE_DEFAULT = 16f    // 默认(dp) — 沿用旧 FOLD_SIZE_DP 硬编码值
+    const val KEY_START_VIEW = "start_view" // "full" / "cards" — 启动默认视图（仅通用设置里设置；手动切换课表顶部视图不写入；出厂默认 cards）
+    const val KEY_SHOW_DATE = "show_date"       // boolean — 网格视图表头显示当前日期（出厂默认 true，用户反馈找不到开关）
+    const val KEY_VISIBLE_DAYS = "visible_days" // "1,2,3,4,5,6,7"
+    const val KEY_VERT_PUNCT_REPLACE = "vert_punct_replace" // bool default false (方案B开关)
+    const val KEY_WIDGET_COLORLESS = "widget_colorless" // bool default false
+    const val KEY_COURSE_COLORLESS = "course_colorless" // bool default false (App 课程胶囊专用)
+    /** 课程色呈现方式（用户 2026-09-28 定：**两版都保留**，作为可选项）：
+     *  "fill" = 整块用课色填充 + 自适应文字色（**出厂默认**，传统课表观感）
+     *  "bar"  = 颜色只占左缘一条柔和色条 + 时间文字用中性色（克制，与今日页一致，用户可自行切换）
+     *  只影响**课表视图**（网格 / 周视图）；今日页固定用色条那套。 */
+    const val KEY_COURSE_COLOR_STYLE = "course_color_style"
+    const val COURSE_STYLE_BAR = "bar"
+    const val COURSE_STYLE_FILL = "fill"
+    const val KEY_WIDGET_SEPARATOR = "widget_separator" // bool default true (WeekView 纯文字课程间分隔线)
+    const val KEY_GRID_SCALE = "grid_scale" // float 0.7~1.3 default 1.0 — 网格视图整体缩放(字号/行高/间距/圆角联动, issue#8)
+    const val KEY_GRID_AUTO_HIDE_EMPTY_EVENING = "grid_auto_hide_empty_evening" // bool default false — 实验室: 网格视图自动收起无课晚间节次
+    const val KEY_GRID_ADAPTIVE_HEIGHT = "grid_adaptive_height" // bool default true — 实验室: 网格视图自适应行高(默认固定 52dp 基座)
+    const val KEY_GRID_EVENING_START = "grid_evening_start" // string "HH:mm" default 18:00 — 实验室: 晚间起始时间(用户自定义)
+    const val KEY_GRID_ROW_SCALE = "grid_row_scale" // float default 1.0 — 双指行高缩放确认值(相对基座; 顶栏 tick 落盘, 撤回回退)
+    const val KEY_GRID_PINCH_ZOOM = "grid_pinch_zoom" // bool default false — 实验室: 网格视图双指捏放行高(v1.0.56 默认关, 关=手势不挂; 存量缩放值不清)
+    const val DEFAULT_GRID_PINCH_ZOOM = false
+    // 2026-09-27 用户决定：本开关**只喂小组件**（App 内已取消最近有课日跳转，见 ScheduleViewModel 注释）
+    const val KEY_NEAREST_BUSY_DAY = "nearest_busy_day" // bool default false — 今天没课时小组件显示最近一个有课的日子
+    const val DEFAULT_NEAREST_BUSY_DAY = false
+    const val KEY_WEEK_SCALE = "week_scale" // float 0.7~1.3 default 1.0 — 周视图整体缩放(与网格视图互相独立, issue#8)
+    const val KEY_GRID_CORNER_RATIO = "grid_corner_ratio" // float 0.0~2.0 default 1.0 — 网格/周视图圆角比例系数(乘基准 12/16dp, issue#8)
+    const val KEY_WEEK_TWO_COLUMN = "week_two_column" // bool default false — 周视图两栏开关, issue#8
+    const val KEY_WEEK_TWO_COLUMN_MODE = "week_two_column_mode" // "days"=按天对半分 / "balance"=按课程数动态平衡, issue#8
+    const val KEY_WEEK_HIDE_EMPTY_DAYS = "week_hide_empty_days" // bool default false — 周视图隐藏无课日(仅两栏下生效, issue#8)
+    // issue#26 课程别名 — 三场景各自开关, 默认 false = 显示原名
+    const val KEY_WEEK_USE_ALIAS = "week_use_alias"     // bool default false — 周视图显示别名
+    const val KEY_GRID_USE_ALIAS = "grid_use_alias"     // bool default false — 网格视图显示别名
+    const val KEY_WIDGET_USE_ALIAS = "widget_use_alias" // bool default false — 全部小组件显示别名
+    const val KEY_UPDATE_CHECK_ENABLED = "update_check_enabled" // bool default true — 启动时检查 GitHub releases latest（失败静默）
+    const val KEY_UPDATE_NOTICE_DISMISSED_VERSION = "update_notice_dismissed_version" // string — 关闭该版本更新提醒
+    const val KEY_HIGH_REFRESH = "high_refresh_rate" // bool default true — 窗口 preferredDisplayModeId 钉屏幕最高刷率(流畅优先); 关=跟随系统省电调度
+    const val KEY_NAV_DOCK = "nav_dock" // bool default false — 底栏形态: false=贴底(通栏), true=悬浮药丸(Dock, 底边留距)
+    const val KEY_THEME_MODE = "theme_mode"  // light/dark/system
+    const val THEME_MODE_LIGHT = "light"
+    const val THEME_MODE_DARK = "dark"
+    const val THEME_MODE_SYSTEM = "system"
+
+    // 启动直达页面：打开应用先落在哪个 tab（出厂默认课表，与旧行为一致）
+    const val KEY_LAUNCH_TAB = "launch_tab"
+    const val LAUNCH_TAB_SCHEDULE = "schedule"
+    const val LAUNCH_TAB_TODAY = "today"
+    const val LAUNCH_TAB_MANAGE = "manage"
+    const val LAUNCH_TAB_MEMO = "memo"
+    const val LAUNCH_TAB_MINE = "mine"
+    val LAUNCH_TABS = listOf(
+        LAUNCH_TAB_SCHEDULE,
+        LAUNCH_TAB_TODAY,
+        LAUNCH_TAB_MANAGE,
+        LAUNCH_TAB_MEMO,
+        LAUNCH_TAB_MINE,
+    )
+
+    fun getLaunchTab(ctx: Context): String =
+        sp(ctx).getString(KEY_LAUNCH_TAB, LAUNCH_TAB_SCHEDULE)?.takeIf { it in LAUNCH_TABS }
+            ?: LAUNCH_TAB_SCHEDULE
+
+    fun setLaunchTab(ctx: Context, value: String) {
+        require(value in LAUNCH_TABS) { "unknown launch tab: $value" }
+        sp(ctx).edit().putString(KEY_LAUNCH_TAB, value).apply()
+    }
+
+    /** Independent reading preferences: center uses only the area above course metadata. */
+    fun isCourseTitleCentered(ctx: Context, widget: Boolean = false): Boolean =
+        displayValue {
+            sp(ctx).getBoolean(if (widget) "widget_title_centered" else "grid_title_centered", true)
+        }
+
+    fun setCourseTitleCentered(ctx: Context, centered: Boolean, widget: Boolean = false) {
+        val key = if (widget) "widget_title_centered" else "grid_title_centered"
+        sp(ctx).edit().putBoolean(key, centered).apply()
+        notifyChanged(key)
+    }
+
+    // ===== 节假日灰显开关 =====
+    const val KEY_HOLIDAY_GREY_HOLIDAY = "holiday_grey_holiday"   // bool default true
+    const val KEY_HOLIDAY_GREY_WEEKEND = "holiday_grey_weekend"   // legacy storage; ordinary weekends never dim
+    const val KEY_HOLIDAY_STYLE = "holiday_style"                  // "grey" / "strikethrough" default "grey"
+    const val KEY_HOLIDAY_IGNORE_WORKDAY = "holiday_ignore_workday" // legacy storage; makeup days always remain normal
+    const val KEY_HOLIDAY_OVERRIDES = "holiday_overrides"           // JSON — 用户范围化覆盖(编辑/新增/删除节日段)
+    const val KEY_CONFLICT_DEFAULT_TOP = "conflict_default_top"      // JSON {"day:startNode:step": layerRepId} — 冲突簇默认置顶图层; 默认空 = 全由 primaryComparator 决
+
+    private fun sp(ctx: Context): SharedPreferences =
+        ctx.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+
+    /**
+     * 恢复默认设置（UI-20a）：清空本 prefs 文件里的设置项，回到出厂默认。
+     *
+     * 为什么需要它：App 里可调的参数已经很多（网格/周视图缩放、圆角、冲突样式与三根偏移滑杆、
+     * 可见星期、提醒时间、节假日灰显、导航形态……），调乱了**除了卸载重装没有别的退路**；
+     * 而卸载重装会连课表一起清掉。
+     *
+     * **刻意不动**的三样（属于"用户数据"，不是"显示参数"）：
+     *  · 课表与课程 —— 存在 Room 数据库里，本来就不在 prefs；
+     *  · 自定义主题 —— 存在另一个 prefs 文件（`CustomThemeCore.PREFS_NAME`）；
+     *  · 每张课表的节假日调休映射 —— `holiday_transfer_<tableId>`，按前缀原样保留。
+     */
+    fun resetSettings(ctx: Context) {
+        val keepPrefixes = listOf("holiday_transfer_")
+        val prefs = sp(ctx)
+        val keep = prefs.all.filterKeys { key -> keepPrefixes.any { key.startsWith(it) } }
+        val editor = prefs.edit().clear()
+        keep.forEach { (k, v) ->
+            when (v) {
+                is String -> editor.putString(k, v)
+                is Boolean -> editor.putBoolean(k, v)
+                is Int -> editor.putInt(k, v)
+                is Long -> editor.putLong(k, v)
+                is Float -> editor.putFloat(k, v)
+                is Set<*> -> editor.putStringSet(k, v.filterIsInstance<String>().toSet())
+            }
+        }
+        editor.apply()
+        // 通知订阅方（UI 用 changeBus 主动 recompose）
+        notifyChanged("__reset__")
+    }
+
+    /** 实际是否深色：dark→true, light→false, system→isSystemDark。isSystemDark 由调用方传入。 */
+    fun isDarkMode(ctx: Context, isSystemDark: Boolean = false): Boolean {
+        // 向后兼容：旧 boolean KEY_DARK 在无新三态时生效
+        if (!sp(ctx).contains(KEY_THEME_MODE)) {
+            val legacy = sp(ctx).all[KEY_DARK] as? Boolean
+            if (legacy != null) return legacy
+        }
+        return when (getThemeMode(ctx)) {
+            THEME_MODE_DARK -> true
+            THEME_MODE_LIGHT -> false
+            else -> isSystemDark
+        }
+    }
+
+    // isSystemDark 由 UI 层用 isSystemInDarkTheme() 传入，避免在 object 里取系统配置。
+
+
+    /** 主题模式：light / dark / system。出厂默认 **light**（2026-10-14 手机配置基线）。 */
+    fun getThemeMode(ctx: Context): String =
+        sp(ctx).getString(KEY_THEME_MODE, THEME_MODE_LIGHT) ?: THEME_MODE_LIGHT
+
+    fun setThemeMode(ctx: Context, mode: String) {
+        require(mode == THEME_MODE_LIGHT || mode == THEME_MODE_DARK || mode == THEME_MODE_SYSTEM)
+        sp(ctx).edit().putString(KEY_THEME_MODE, mode).apply()
+    }
+
+
+    // ===== 主题色 =====
+
+    fun getThemeKey(ctx: Context): String =
+        sp(ctx).getString(KEY_THEME, com.easykebiao.app.ui.theme.ThemePresets.DEFAULT_KEY)
+            ?: com.easykebiao.app.ui.theme.ThemePresets.DEFAULT_KEY
+
+    fun setThemeKey(ctx: Context, key: String) {
+        sp(ctx).edit().putString(KEY_THEME, key).apply()
+    }
+
+    fun themeKeyFlow(ctx: Context): Flow<String> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, k ->
+            if (k == KEY_THEME) {
+                val v = sp.getString(KEY_THEME, com.easykebiao.app.ui.theme.ThemePresets.DEFAULT_KEY)
+                    ?: com.easykebiao.app.ui.theme.ThemePresets.DEFAULT_KEY
+                trySend(v)
+            }
+        }
+        val sp = sp(ctx)
+        sp.registerOnSharedPreferenceChangeListener(listener)
+        trySend(getThemeKey(ctx))
+        awaitClose { sp.unregisterOnSharedPreferenceChangeListener(listener) }
+    }.distinctUntilChanged()
+
+    // ===== 提醒 =====
+
+    /** Phone baseline: reminders are off; sub-options retain the selected configuration. */
+    fun isReminderEnabled(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_REMINDER, false)
+
+    fun setReminderEnabled(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_REMINDER, v).apply()
+    }
+
+    /** Daily reminder sub-toggle — default false (only active when master on) */
+    fun isDailyReminderEnabled(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_DAILY_ENABLED, false)
+
+    fun setDailyReminderEnabled(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_DAILY_ENABLED, v).apply()
+    }
+
+    /** Daily reminder time "HH:mm" — default "07:00" */
+    fun getDailyReminderTime(ctx: Context): String =
+        sp(ctx).getString(KEY_DAILY_TIME, "07:00") ?: "07:00"
+
+    fun setDailyReminderTime(ctx: Context, time: String) {
+        sp(ctx).edit().putString(KEY_DAILY_TIME, time).apply()
+    }
+
+    /** Same-day reminder sub-toggle — default on preserves existing daily reminder behavior. */
+    fun isTodayReminderEnabled(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_TODAY_REMINDER_ENABLED, DEFAULT_TODAY_REMINDER_ENABLED)
+
+    fun setTodayReminderEnabled(ctx: Context, enabled: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_TODAY_REMINDER_ENABLED, enabled).apply()
+    }
+
+    /** Previous-evening reminder — default off so existing users do not receive a new notification. */
+    fun isTomorrowReminderEnabled(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_TOMORROW_REMINDER_ENABLED, DEFAULT_TOMORROW_REMINDER_ENABLED)
+
+    fun setTomorrowReminderEnabled(ctx: Context, enabled: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_TOMORROW_REMINDER_ENABLED, enabled).apply()
+    }
+
+    /** Previous-evening reminder time "HH:mm" — default "22:00". */
+    fun getTomorrowReminderTime(ctx: Context): String =
+        sp(ctx).getString(KEY_TOMORROW_REMINDER_TIME, DEFAULT_TOMORROW_REMINDER_TIME)
+            ?: DEFAULT_TOMORROW_REMINDER_TIME
+
+    fun setTomorrowReminderTime(ctx: Context, time: String) {
+        sp(ctx).edit().putString(KEY_TOMORROW_REMINDER_TIME, time).apply()
+    }
+
+    /** Before-class reminder sub-toggle — default true (master defaults off) */
+    fun isBeforeClassEnabled(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_BEFORE_CLASS_ENABLED, true)
+
+    fun setBeforeClassEnabled(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_BEFORE_CLASS_ENABLED, v).apply()
+    }
+
+    /** Minutes before class to notify — default 5 */
+    fun getBeforeClassMinutes(ctx: Context): Int =
+        sp(ctx).getInt(KEY_BEFORE_CLASS_MINUTES, 5)
+
+    fun setBeforeClassMinutes(ctx: Context, minutes: Int) {
+        sp(ctx).edit().putInt(KEY_BEFORE_CLASS_MINUTES, minutes).apply()
+    }
+
+    fun isBeforeClassBannerEnabled(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_BEFORE_CLASS_BANNER, true)
+
+    fun setBeforeClassBannerEnabled(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_BEFORE_CLASS_BANNER, v).apply()
+    }
+
+    fun isBeforeClassFluidEnabled(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_BEFORE_CLASS_FLUID, true)
+
+    fun setBeforeClassFluidEnabled(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_BEFORE_CLASS_FLUID, v).apply()
+    }
+
+    fun getBeforeClassFluidFields(ctx: Context): Set<String> =
+        (sp(ctx).getString(KEY_BEFORE_CLASS_FLUID_FIELDS, "name,time,room,teacher")
+            ?: "name,time,room,teacher").split(",").filter { it.isNotBlank() }.toSet()
+
+    // setBeforeClassFluidFields 死写路径已删（legacy 多选写入口, 全库零调用; 读取仅 BeforeClassNotifyReceiver 用旧数据）
+
+    fun getBeforeClassFluidPrimary(ctx: Context): String =
+        sp(ctx).getString(KEY_BEFORE_CLASS_FLUID_PRIMARY, "room") ?: "room"
+
+    fun setBeforeClassFluidPrimary(ctx: Context, value: String) {
+        require(value == "name" || value == "time" || value == "room")
+        // 只写 PRIMARY；不再覆盖 FIELDS（多选字段集），否则用户配置的多字段组合被冲掉。
+        sp(ctx).edit().putString(KEY_BEFORE_CLASS_FLUID_PRIMARY, value).apply()
+    }
+
+
+    fun getLanguage(ctx: Context): String =
+        SupportedLanguages.normalize(sp(ctx).getString(KEY_LANG, "zh-CN"))
+
+    fun setLanguage(ctx: Context, lang: String) {
+        sp(ctx).edit().putString(KEY_LANG, SupportedLanguages.normalize(lang)).apply()
+    }
+
+    // ===== 显示模式：节次 / 时间 =====
+
+    // 出厂默认 "time"（时间段）— 用户 2026-09-14 指令: 默认显示时间而非节次;
+    // 设置页节次/时间二选一仍可改; 已手动设置过的老用户不受影响 (已存值优先)
+    fun getDisplayMode(ctx: Context): String =
+        sp(ctx).getString(KEY_DISPLAY_MODE, "time") ?: "time"
+
+    fun setDisplayMode(ctx: Context, mode: String) {
+        sp(ctx).edit().putString(KEY_DISPLAY_MODE, mode).apply()
+        notifyChanged(KEY_DISPLAY_MODE)
+    }
+
+    // ===== 高刷新率(流畅优先) =====
+
+    fun isHighRefresh(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_HIGH_REFRESH, true)
+
+    fun setHighRefresh(ctx: Context, value: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_HIGH_REFRESH, value).apply()
+    }
+
+    /** 底栏形态: false=贴底(默认), true=悬浮药丸 Dock */
+    fun isNavDock(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_NAV_DOCK, true)   // 出厂默认悬浮药丸（用户 2026-09-28 定）
+
+    fun setNavDock(ctx: Context, value: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_NAV_DOCK, value).apply()
+    }
+
+    fun getUpdateNoticeDismissedVersion(ctx: Context): String =
+        sp(ctx).getString(KEY_UPDATE_NOTICE_DISMISSED_VERSION, "").orEmpty()
+
+    fun setUpdateNoticeDismissedVersion(ctx: Context, version: String) {
+        sp(ctx).edit().putString(KEY_UPDATE_NOTICE_DISMISSED_VERSION, version).apply()
+    }
+
+    // ===== 网格卡片副信息：教室 / 教师 / 无 =====
+
+    fun getGridSubInfo(ctx: Context): String =
+        displayValue {
+            sp(ctx).getString(KEY_GRID_SUB_INFO, "room") ?: "room"
+        }
+
+    fun setGridSubInfo(ctx: Context, value: String) {
+        require(value == "room" || value == "teacher" || value == "none")
+        sp(ctx).edit().putString(KEY_GRID_SUB_INFO, value).apply()
+        notifyChanged(KEY_GRID_SUB_INFO)
+    }
+
+    // ===== 冲突课程显示样式：叠层 / 折角 / 竖轨 =====
+
+    // Fixed presentation policy; legacy preference is retained for rollback.
+    fun getConflictStyle(ctx: Context): String =
+        "rail"
+
+    fun setConflictStyle(ctx: Context, value: String) {
+        require(value == "stack" || value == "fold" || value == "rail")
+        sp(ctx).edit().putString(KEY_CONFLICT_STYLE, value).apply()
+    }
+
+    // ===== 冲突顶卡收窄量(用户 2026-09-04 拆分: 叠层/竖轨独立配置不共享) =====
+    // 首次读取时从旧共用 key 迁移一次(旧值复制到两新 key), 旧 key 停写保留仅作迁移源。
+
+    fun getConflictStackInset(ctx: Context): Float {
+        val sp = sp(ctx)
+        if (!sp.contains(KEY_CONFLICT_STACK_INSET)) {
+            sp.edit()
+                .putFloat(KEY_CONFLICT_STACK_INSET, sp.getFloat(KEY_CONFLICT_TOP_INSET, CONFLICT_TOP_INSET_DEFAULT))
+                .apply()
+        }
+        return sp.getFloat(KEY_CONFLICT_STACK_INSET, CONFLICT_TOP_INSET_DEFAULT)
+    }
+
+    fun setConflictStackInset(ctx: Context, value: Float) {
+        require(value in CONFLICT_TOP_INSET_RANGE)
+        sp(ctx).edit().putFloat(KEY_CONFLICT_STACK_INSET, value).apply()
+    }
+
+    fun getConflictRailInset(ctx: Context): Float {
+        val sp = sp(ctx)
+        if (!sp.contains(KEY_CONFLICT_RAIL_INSET)) {
+            sp.edit()
+                .putFloat(KEY_CONFLICT_RAIL_INSET, sp.getFloat(KEY_CONFLICT_TOP_INSET, CONFLICT_TOP_INSET_DEFAULT))
+                .apply()
+        }
+        return sp.getFloat(KEY_CONFLICT_RAIL_INSET, CONFLICT_TOP_INSET_DEFAULT)
+    }
+
+    fun setConflictRailInset(ctx: Context, value: Float) {
+        require(value in CONFLICT_TOP_INSET_RANGE)
+        sp(ctx).edit().putFloat(KEY_CONFLICT_RAIL_INSET, value).apply()
+    }
+
+    // ===== 冲突折角幅度(fold 样式专有,用户 2026-09-03 拖杆) =====
+    // 折痕直角边长 f(dp): 驱动 FoldCutShape 剪裁/flap 视觉/foldSwitchHitArea 命中区同一真值。
+
+    fun getConflictFoldSize(ctx: Context): Float =
+        sp(ctx).getFloat(KEY_CONFLICT_FOLD_SIZE, CONFLICT_FOLD_SIZE_DEFAULT)
+
+    fun setConflictFoldSize(ctx: Context, value: Float) {
+        require(value in CONFLICT_FOLD_SIZE_RANGE)
+        sp(ctx).edit().putFloat(KEY_CONFLICT_FOLD_SIZE, value).apply()
+    }
+
+    // ===== 冲突簇默认置顶图层 =====
+    // JSON Map<clusterKey, layerRepId>: clusterKey = "${day}:${startNode}:${step}",
+    // layerRepId = 该簇某图层的 representative course id(选 layer = 整图层置顶,保持图层原子性)。
+    // 写入空串视为清空(unset 单值);整个 map 用 JSON 编码,简易 org.json 实现,避免引第三方。
+
+    fun getConflictDefaultTop(ctx: Context): Map<String, Long> {
+        // 内存真相源优先:点击 → putConflictDefaultTop 同步更新 StateFlow → 订阅方
+        // 同帧 recompose(用户 2026-09-02:「勾选的那一瞬间课表就应该完成置顶更新」)。
+        // SharedPreferences 监听器回调不保证同帧(apply 异步落盘后才触发)。
+        _conflictDefaultTopState.value.let { return it }
+    }
+
+    fun setConflictDefaultTop(ctx: Context, map: Map<String, Long>) {
+        _conflictDefaultTopState.value = map.toMap()   // 同步内存 → 瞬时驱动 UI
+        sp(ctx).edit().putString(KEY_CONFLICT_DEFAULT_TOP, encodeDefaultTopMap(map)).apply()
+        notifyChanged(KEY_CONFLICT_DEFAULT_TOP)
+    }
+
+    /** 修改单个 clusterKey;传 null = 删除该键(回退系统默认)。 */
+    fun putConflictDefaultTop(ctx: Context, clusterKey: String, layerRepId: Long?) {
+        val current = getConflictDefaultTop(ctx).toMutableMap()
+        if (layerRepId == null) current.remove(clusterKey) else current[clusterKey] = layerRepId
+        setConflictDefaultTop(ctx, current)
+    }
+
+    /**
+     * 冷启动加载磁盘值进内存真相源 — 在 App 首个 Composable 订阅前调用一次即可,
+     * 幂等(磁盘值与内存一致时 StateFlow 不发射)。
+     */
+    fun primeConflictDefaultTop(ctx: Context) {
+        val disk = decodeDefaultTopMap(sp(ctx).getString(KEY_CONFLICT_DEFAULT_TOP, "{}") ?: "{}")
+        if (_conflictDefaultTopState.value != disk) _conflictDefaultTopState.value = disk
+    }
+
+    /**
+     * v7.10.2 瞬时更新通道 — StateFlow 调用 setValue 即同步换值,
+     * collectAsState 订阅方同一帧 recompose;替代原 callbackFlow+SharedPreferences
+     * 监听器路径(apply 异步 → 监听回调晚于点击帧,网格刷新滞后)。
+     */
+    private val _conflictDefaultTopState = MutableStateFlow<Map<String, Long>>(emptyMap())
+    val conflictDefaultTopState: StateFlow<Map<String, Long>> = _conflictDefaultTopState.asStateFlow()
+
+    fun conflictDefaultTopFlow(ctx: Context): Flow<Map<String, Long>> {
+        primeConflictDefaultTop(ctx)
+        return conflictDefaultTopState
+    }
+
+    private fun encodeDefaultTopMap(map: Map<String, Long>): String {
+        val obj = org.json.JSONObject()
+        for ((k, v) in map) obj.put(k, v)
+        return obj.toString()
+    }
+
+    private fun decodeDefaultTopMap(json: String): Map<String, Long> {
+        if (json.isBlank()) return emptyMap()
+        return try {
+            val obj = org.json.JSONObject(json)
+            val out = mutableMapOf<String, Long>()
+            val it = obj.keys()
+            while (it.hasNext()) {
+                val k = it.next()
+                out[k] = obj.optLong(k, Long.MIN_VALUE).takeIf { it != Long.MIN_VALUE } ?: continue
+            }
+            out
+        } catch (_: Exception) { emptyMap() }
+    }
+
+    // ===== 启动默认视图：完整 / 卡片 =====
+
+    // 出厂默认 "cards"（网格视图）— 用户反馈网格更好用，新装直接进网格
+    fun getStartView(ctx: Context): String =
+        sp(ctx).getString(KEY_START_VIEW, "cards") ?: "cards"
+
+    fun setStartView(ctx: Context, value: String) {
+        require(value == "full" || value == "cards")
+        sp(ctx).edit().putString(KEY_START_VIEW, value).apply()
+    }
+
+    // ===== 网格显示日期 =====
+
+    // 出厂默认显示日期 — 用户反馈不知道开关在哪，直接默认开；设置页仍可关
+    fun isShowDate(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_SHOW_DATE, true)
+
+    fun setShowDate(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_SHOW_DATE, v).apply()
+    }
+
+    // ===== 可见天 =====
+
+    fun getVisibleDays(ctx: Context): Set<Int> {
+        val raw = sp(ctx).getString(KEY_VISIBLE_DAYS, "1,2,3,4,5,6,7") ?: "1,2,3,4,5,6,7"
+        return raw.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()
+    }
+
+    fun setVisibleDays(ctx: Context, days: Set<Int>) {
+        sp(ctx).edit().putString(KEY_VISIBLE_DAYS, days.sorted().joinToString(",")).apply()
+        notifyChanged(KEY_VISIBLE_DAYS)
+    }
+
+    // ===== 竖排标点优化(方案B: 标点替换为 Unicode Vertical Forms) — 默认 false =====
+
+    fun isVertPunctReplace(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_VERT_PUNCT_REPLACE, false)
+
+    fun setVertPunctReplace(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_VERT_PUNCT_REPLACE, v).apply()
+    }
+
+    // Shared widget preference; phone baseline hides the timetable name.
+    fun isWidgetShowTableName(ctx: Context): Boolean =
+        sp(ctx).getBoolean("widget_show_table_name", false)
+
+    fun setWidgetShowTableName(ctx: Context, value: Boolean) {
+        sp(ctx).edit().putBoolean("widget_show_table_name", value).apply()
+    }
+
+    // ===== 小组件无色模式 — 默认 false =====
+
+    fun isWidgetColorless(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_WIDGET_COLORLESS, false)
+
+    fun setWidgetColorless(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_WIDGET_COLORLESS, v).apply()
+    }
+
+    // ===== App 课程胶囊无色模式 — 默认 false =====
+
+    fun isCourseColorless(ctx: Context): Boolean =
+        displayValue {
+            sp(ctx).getBoolean(KEY_COURSE_COLORLESS, false)
+        }
+
+    /** Effective fill/bar rendering for the unified choice under Appearance. */
+    fun getCourseColorStyle(ctx: Context): String =
+        displayValue {
+            getCourseAppearance(ctx).style
+        }
+
+    fun getCourseAppearance(ctx: Context): CourseAppearance = CourseAppearance.fromLegacy(
+        sp(ctx).getString(KEY_COURSE_COLOR_STYLE, COURSE_STYLE_FILL),
+        sp(ctx).getBoolean(KEY_COURSE_COLORLESS, false)
+    )
+
+    fun setCourseAppearance(ctx: Context, value: CourseAppearance) {
+        // One editor avoids intermediate combinations when changing modes.
+        sp(ctx).edit()
+            .putString(KEY_COURSE_COLOR_STYLE, value.style)
+            .putBoolean(KEY_COURSE_COLORLESS, value.colorless)
+            .apply()
+        notifyChanged(KEY_COURSE_COLOR_STYLE)
+    }
+
+    fun setCourseColorStyle(ctx: Context, v: String) {
+        sp(ctx).edit().putString(
+            KEY_COURSE_COLOR_STYLE,
+            if (v == COURSE_STYLE_FILL) COURSE_STYLE_FILL else COURSE_STYLE_BAR
+        ).apply()
+        notifyChanged(KEY_COURSE_COLOR_STYLE)
+    }
+
+    fun setCourseColorless(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_COURSE_COLORLESS, v).apply()
+    }
+
+    // ===== WeekView 纯文字组件：课程间分隔线 — 默认 true =====
+
+    // Fixed presentation policy; legacy preference is retained for rollback.
+    fun isWidgetSeparator(ctx: Context): Boolean =
+        true
+
+    fun setWidgetSeparator(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_WIDGET_SEPARATOR, v).apply()
+    }
+
+    // ===== 视图整体缩放(issue#8) — 0.7~1.3, 默认 1.0 =====
+    // 网格视图与周视图各一个系数, 互相独立(用户: 两边最优缩放不一样)
+    // 联动项: 字号/行高/间距/圆角/内边距; 不影响小组件与列表视图
+
+    fun getGridScale(ctx: Context): Float =
+        displayValue {
+            sp(ctx).getFloat(KEY_GRID_SCALE, 1.0f).coerceIn(0.7f, 1.3f)
+        }
+
+    fun setGridScale(ctx: Context, v: Float) {
+        sp(ctx).edit().putFloat(KEY_GRID_SCALE, v.coerceIn(0.7f, 1.3f)).apply()
+        notifyChanged(KEY_GRID_SCALE)
+    }
+
+    fun isGridAutoHideEmptyEvening(ctx: Context): Boolean =
+        displayValue {
+            sp(ctx).getBoolean(KEY_GRID_AUTO_HIDE_EMPTY_EVENING, false)
+        }
+
+    fun setGridAutoHideEmptyEvening(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_GRID_AUTO_HIDE_EMPTY_EVENING, v).apply()
+        notifyChanged(KEY_GRID_AUTO_HIDE_EMPTY_EVENING)
+    }
+
+    fun isGridAdaptiveHeight(ctx: Context): Boolean =
+        displayValue {
+            sp(ctx).getBoolean(KEY_GRID_ADAPTIVE_HEIGHT, true)
+        }
+
+    fun setGridAdaptiveHeight(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_GRID_ADAPTIVE_HEIGHT, v).apply()
+        notifyChanged(KEY_GRID_ADAPTIVE_HEIGHT)
+    }
+
+    // Manual mode supports resizing directly; auto-fit must not acquire a competing gesture.
+    // Fixed presentation policy; legacy preference is retained for rollback.
+    fun isGridPinchZoom(ctx: Context): Boolean =
+        !isGridAdaptiveHeight(ctx)
+
+    fun setGridPinchZoom(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_GRID_PINCH_ZOOM, v).apply()
+        notifyChanged(KEY_GRID_PINCH_ZOOM)
+    }
+
+    fun isNearestBusyDay(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_NEAREST_BUSY_DAY, DEFAULT_NEAREST_BUSY_DAY)
+
+    fun setNearestBusyDay(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_NEAREST_BUSY_DAY, v).apply()
+        notifyChanged(KEY_NEAREST_BUSY_DAY)
+    }
+
+    fun getGridEveningStart(ctx: Context): String =
+        displayValue {
+            sp(ctx).getString(KEY_GRID_EVENING_START, "18:00") ?: "18:00"
+        }
+
+    fun setGridEveningStart(ctx: Context, v: String) {
+        sp(ctx).edit().putString(KEY_GRID_EVENING_START, v).apply()
+        notifyChanged(KEY_GRID_EVENING_START)
+    }
+
+    fun getGridRowScale(ctx: Context): Float =
+        sp(ctx).getFloat(KEY_GRID_ROW_SCALE, 1.0f)
+
+    fun setGridRowScale(ctx: Context, v: Float) {
+        sp(ctx).edit().putFloat(KEY_GRID_ROW_SCALE, v).apply()
+        notifyChanged(KEY_GRID_ROW_SCALE)
+    }
+
+    fun getWeekScale(ctx: Context): Float =
+        displayValue {
+            sp(ctx).getFloat(KEY_WEEK_SCALE, 1.0f).coerceIn(0.7f, 1.3f)
+        }
+
+    fun setWeekScale(ctx: Context, v: Float) {
+        sp(ctx).edit().putFloat(KEY_WEEK_SCALE, v.coerceIn(0.7f, 1.3f)).apply()
+        notifyChanged(KEY_WEEK_SCALE)
+    }
+
+    // ===== 网格/周视图圆角比例(issue#8) — 0.0~2.0, 默认 1.0 =====
+    // 系数乘基准圆角(网格卡 12dp/列表外框 16dp): 0=直角, 1=默认, 2=超圆。两视图共用一个值。
+
+    fun getGridCornerRatio(ctx: Context): Float =
+        displayValue {
+            sp(ctx).getFloat(KEY_GRID_CORNER_RATIO, 1.0f).coerceIn(0f, 2f)
+        }
+
+    fun setGridCornerRatio(ctx: Context, v: Float) {
+        sp(ctx).edit().putFloat(KEY_GRID_CORNER_RATIO, v.coerceIn(0f, 2f)).apply()
+        notifyChanged(KEY_GRID_CORNER_RATIO)
+    }
+
+    // ===== 周视图两栏(issue#8) — 默认关 =====
+    // 开启后周视图课程列表拆左右两栏, 省纵向滚动; 分栏标准二选一:
+    //   days    = 按天对半分(前半周左/后半周右, 天数固定)
+    //   balance = 按当天课程数动态平衡(逐天放进课少的栏, 两栏高度接近; 天位置不固定)
+
+    fun isWeekTwoColumn(ctx: Context): Boolean =
+        displayValue {
+            sp(ctx).getBoolean(KEY_WEEK_TWO_COLUMN, false)
+        }
+
+    fun setWeekTwoColumn(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_WEEK_TWO_COLUMN, v).apply()
+        notifyChanged(KEY_WEEK_TWO_COLUMN)
+    }
+
+    // Fixed presentation policy; legacy preference is retained for rollback.
+    fun getWeekTwoColumnMode(ctx: Context): String =
+        displayValue {
+            "days"
+        }
+
+    fun setWeekTwoColumnMode(ctx: Context, v: String) {
+        sp(ctx).edit().putString(KEY_WEEK_TWO_COLUMN_MODE, if (v == "balance") "balance" else "days").apply()
+        notifyChanged(KEY_WEEK_TWO_COLUMN_MODE)
+    }
+
+    fun isWeekHideEmptyDays(ctx: Context): Boolean =
+        displayValue {
+            sp(ctx).getBoolean(KEY_WEEK_HIDE_EMPTY_DAYS, false)
+        }
+
+    fun setWeekHideEmptyDays(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_WEEK_HIDE_EMPTY_DAYS, v).apply()
+        notifyChanged(KEY_WEEK_HIDE_EMPTY_DAYS)
+    }
+
+    // ===== Timetable views prefer aliases; widget display retains its independent setting. =====
+    // alias 只改"展示名"; 详情/预览/通知/导出等身份场景永远原名。
+    // widget 是全局一档(渲染器无 widgetId, 与 colorless/separator/vertPunct 同先例)。
+
+    // Fixed presentation policy; legacy preference is retained for rollback.
+    fun isWeekUseAlias(ctx: Context): Boolean =
+        displayValue {
+            true
+        }
+
+    fun setWeekUseAlias(ctx: Context, v: Boolean) {
+        sp(ctx).edit { putBoolean(KEY_WEEK_USE_ALIAS, v) }
+        notifyChanged(KEY_WEEK_USE_ALIAS)
+    }
+
+    // Fixed presentation policy; legacy preference is retained for rollback.
+    fun isGridUseAlias(ctx: Context): Boolean =
+        displayValue {
+            true
+        }
+
+    fun setGridUseAlias(ctx: Context, v: Boolean) {
+        sp(ctx).edit { putBoolean(KEY_GRID_USE_ALIAS, v) }
+        notifyChanged(KEY_GRID_USE_ALIAS)
+    }
+
+    fun isWidgetUseAlias(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_WIDGET_USE_ALIAS, false)
+
+    fun setWidgetUseAlias(ctx: Context, v: Boolean) {
+        sp(ctx).edit { putBoolean(KEY_WIDGET_USE_ALIAS, v) }
+        notifyChanged(KEY_WIDGET_USE_ALIAS)
+    }
+
+    // 强制滚动(实验) — 旧全局一档 (设计 §6)。2026-09-14 起滚动改为 per-widget
+    // (WidgetScrollStore), 本 key 只作「从未显式设置过的实例」的迁移默认, 不再写入。
+    //
+    // ===== 节假日灰显 =====
+
+    /** 法定节假日灰显开关 — 默认 true */
+    fun isHolidayGreyHoliday(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_HOLIDAY_GREY_HOLIDAY, true)
+
+    fun setHolidayGreyHoliday(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_HOLIDAY_GREY_HOLIDAY, v).apply()
+        notifyChanged(KEY_HOLIDAY_GREY_HOLIDAY)
+    }
+
+    /** 旧周末偏好 — 默认 false；当前显示规则不会按周末灰显 */
+    fun isHolidayGreyWeekend(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_HOLIDAY_GREY_WEEKEND, false)
+
+    fun setHolidayGreyWeekend(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_HOLIDAY_GREY_WEEKEND, v).apply()
+    }
+
+    /** 灰显样式 — 默认 "grey" */
+    fun getHolidayStyle(ctx: Context): String =
+        displayValue {
+            sp(ctx).getString(KEY_HOLIDAY_STYLE, "grey") ?: "grey"
+        }
+
+    fun setHolidayStyle(ctx: Context, style: String) {
+        require(style == "grey" || style == "strikethrough")
+        sp(ctx).edit().putString(KEY_HOLIDAY_STYLE, style).apply()
+        notifyChanged(KEY_HOLIDAY_STYLE)
+    }
+
+    /** 忽略补班日 — 默认 true */
+    fun isHolidayIgnoreWorkday(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_HOLIDAY_IGNORE_WORKDAY, true)
+
+    fun setHolidayIgnoreWorkday(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_HOLIDAY_IGNORE_WORKDAY, v).apply()
+    }
+
+    // ===== 节假日用户覆盖（范围化段）=====
+
+    /** 用户范围化覆盖段: 编辑/新增/删除节日段。JSON 由 HolidayRangeOps 编解码。 */
+    fun getHolidayRanges(ctx: Context): List<com.easykebiao.app.util.HolidayRange> =
+        com.easykebiao.app.util.HolidayRangeOps.decodeOverrides(sp(ctx).getString(KEY_HOLIDAY_OVERRIDES, "[]") ?: "[]")
+
+    fun setHolidayRanges(ctx: Context, ranges: List<com.easykebiao.app.util.HolidayRange>) {
+        sp(ctx).edit().putString(KEY_HOLIDAY_OVERRIDES, com.easykebiao.app.util.HolidayRangeOps.encodeOverrides(ranges)).apply()
+        notifyChanged(KEY_HOLIDAY_OVERRIDES)
+    }
+
+    // ===== issue#44 调休映射(按课表隔离, 放假日→补班日) =====
+
+    /**
+     * 调休映射按课表 ID 单独存 key — 各校补法不同(同一天 A 校补周四、B 校补周一),
+     * 全局一份会跨表套错。删表时可整键删除。
+     */
+    private fun transferKey(tableId: Long) = "holiday_transfer_$tableId"
+
+    /** 某课表的调休映射; 无表/未设置 = 空(全部按自然星期取课) */
+    fun getHolidayTransfers(ctx: Context, tableId: Long): List<com.easykebiao.app.util.HolidayTransferEntry> =
+        com.easykebiao.app.util.HolidayRangeOps.HolidayTransferOps.decodeTransfers(
+            sp(ctx).getString(transferKey(tableId), "[]") ?: "[]"
+        )
+
+    fun setHolidayTransfers(ctx: Context, tableId: Long, transfers: List<com.easykebiao.app.util.HolidayTransferEntry>) {
+        sp(ctx).edit().putString(
+            transferKey(tableId),
+            com.easykebiao.app.util.HolidayRangeOps.HolidayTransferOps.encodeTransfers(transfers)
+        ).apply()
+        notifyChanged(transferKey(tableId))
+    }
+
+    /**
+     * 设/改某放假日的映射; [targetDate] = null → 清除该放假日(回到自然星期)。
+     * 互斥(后选覆盖前选): 写入前移除同 targetDate 的既有条目 — 一天只能上一次课。
+     */
+    fun updateHolidayTransfer(
+        ctx: Context,
+        tableId: Long,
+        sourceDate: java.time.LocalDate,
+        targetDate: java.time.LocalDate?,
+        segmentId: String
+    ) {
+        val ops = com.easykebiao.app.util.HolidayRangeOps.HolidayTransferOps
+        val existing = getHolidayTransfers(ctx, tableId)
+        val next = if (targetDate == null) {
+            existing.filterNot { it.sourceDate == sourceDate }
+        } else {
+            ops.withTargetExclusivity(existing, com.easykebiao.app.util.HolidayTransferEntry(sourceDate, targetDate, segmentId))
+        }
+        setHolidayTransfers(ctx, tableId, next)
+    }
+
+    /** 删表时清掉该表映射 */
+    fun clearHolidayTransfers(ctx: Context, tableId: Long) {
+        sp(ctx).edit().remove(transferKey(tableId)).apply()
+        notifyChanged(transferKey(tableId))
+    }
+
+    // ===== 启动检查更新开关 =====
+
+    // 2026-09-29（准备分发给同学时）恢复为默认 **true**：
+    // UI-5 当时默认关，是因为检查指向**上游 lingion/sleepy** —— 跟着提示装上游包会因签名不同而失败。
+    // 现在检查源是**我们自己的仓库**（AppIdentity.REPO_URL）且签名一致、资产名对得上，
+    // 默认关的原始理由已不存在；而关于页那句「启动时自动检查 GitHub Releases」本来也是这么写的。
+    // 失败静默（UpdateNotifier.maybeCheckOnStart 内 runCatching + 不弹错），下载走镜像 + 直连兜底。
+    fun isUpdateCheckEnabled(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_UPDATE_CHECK_ENABLED, true)
+
+    fun setUpdateCheckEnabled(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_UPDATE_CHECK_ENABLED, v).apply()
+    }
+
+    // ===== 天气（2026-11-22, 0.14.0）=====
+    // 默认开启、默认桂林：装完进今日页就能看到效果。
+    // 天气只在"有网络 + 设了城市"时存在，任何失败都静默 —— 不弹框、不占位。
+
+    const val KEY_WEATHER_ENABLED = "weather_enabled"
+    const val KEY_WEATHER_CITY = "weather_city_name"
+    const val KEY_WEATHER_LAT = "weather_city_lat"
+    const val KEY_WEATHER_LON = "weather_city_lon"
+    const val KEY_WEATHER_ALERT_ENABLED = "weather_alert_enabled"
+    const val KEY_WEATHER_ALERT_PCT = "weather_alert_pct"
+    const val KEY_WEATHER_ALERT_DROP = "weather_alert_drop"
+
+    fun isWeatherEnabled(ctx: Context): Boolean =
+        displayValue { sp(ctx).getBoolean(KEY_WEATHER_ENABLED, true) }
+
+    fun setWeatherEnabled(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_WEATHER_ENABLED, v).apply()
+        notifyChanged(KEY_WEATHER_ENABLED)
+    }
+
+    fun getWeatherCity(ctx: Context): com.easykebiao.app.data.weather.WeatherCity {
+        val name = sp(ctx).getString(KEY_WEATHER_CITY, null)
+        if (name.isNullOrBlank()) return com.easykebiao.app.data.weather.CityCatalog.DEFAULT
+        val lat = sp(ctx).getFloat(KEY_WEATHER_LAT, 0f)
+        val lon = sp(ctx).getFloat(KEY_WEATHER_LON, 0f)
+        if (lat == 0f && lon == 0f) {
+            return com.easykebiao.app.data.weather.CityCatalog.find(name)
+                ?: com.easykebiao.app.data.weather.CityCatalog.DEFAULT
+        }
+        return com.easykebiao.app.data.weather.WeatherCity(name, lat.toDouble(), lon.toDouble())
+    }
+
+    fun setWeatherCity(ctx: Context, city: com.easykebiao.app.data.weather.WeatherCity) {
+        sp(ctx).edit()
+            .putString(KEY_WEATHER_CITY, city.name)
+            .putFloat(KEY_WEATHER_LAT, city.lat.toFloat())
+            .putFloat(KEY_WEATHER_LON, city.lon.toFloat())
+            .apply()
+        notifyChanged(KEY_WEATHER_CITY)
+    }
+
+    /** 上课前的天气提醒（下雨 / 明显降温才响）。 */
+    fun isWeatherAlertEnabled(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_WEATHER_ALERT_ENABLED, true)
+
+    fun setWeatherAlertEnabled(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_WEATHER_ALERT_ENABLED, v).apply()
+    }
+
+    /** 降水概率阈值（%），默认 50。 */
+    fun getWeatherAlertPct(ctx: Context): Int =
+        sp(ctx).getInt(KEY_WEATHER_ALERT_PCT, 50).coerceIn(10, 100)
+
+    fun setWeatherAlertPct(ctx: Context, v: Int) {
+        sp(ctx).edit().putInt(KEY_WEATHER_ALERT_PCT, v.coerceIn(10, 100)).apply()
+    }
+
+    /** 降温阈值（℃），默认 6；明天比今天冷这么多才提。 */
+    fun getWeatherAlertDrop(ctx: Context): Int =
+        sp(ctx).getInt(KEY_WEATHER_ALERT_DROP, 6).coerceIn(1, 20)
+
+    fun setWeatherAlertDrop(ctx: Context, v: Int) {
+        sp(ctx).edit().putInt(KEY_WEATHER_ALERT_DROP, v.coerceIn(1, 20)).apply()
+    }
+
+    // ===== 备忘 AI 整理（BYOK，2026-11-22, 0.14.0）=====
+    // key 存在本机 SharedPreferences（应用私有目录），不上传、不写日志、不进代码。
+    // 不填 key 时走本地规则解析（见 AiMemoLocal），功能可用、只是没模型聪明。
+
+    const val KEY_AI_BASE = "ai_base_url"
+    const val KEY_AI_MODEL = "ai_model"
+    const val KEY_AI_KEY = "ai_api_key"
+    const val DEFAULT_AI_BASE = "https://api.deepseek.com"
+    const val DEFAULT_AI_MODEL = "deepseek-chat"
+
+    fun getAiBaseUrl(ctx: Context): String =
+        sp(ctx).getString(KEY_AI_BASE, DEFAULT_AI_BASE)?.ifBlank { DEFAULT_AI_BASE } ?: DEFAULT_AI_BASE
+
+    fun setAiBaseUrl(ctx: Context, v: String) {
+        sp(ctx).edit().putString(KEY_AI_BASE, v.trim()).apply()
+    }
+
+    fun getAiModel(ctx: Context): String =
+        sp(ctx).getString(KEY_AI_MODEL, DEFAULT_AI_MODEL)?.ifBlank { DEFAULT_AI_MODEL } ?: DEFAULT_AI_MODEL
+
+    fun setAiModel(ctx: Context, v: String) {
+        sp(ctx).edit().putString(KEY_AI_MODEL, v.trim()).apply()
+    }
+
+    fun getAiApiKey(ctx: Context): String =
+        sp(ctx).getString(KEY_AI_KEY, "").orEmpty()
+
+    fun setAiApiKey(ctx: Context, v: String) {
+        sp(ctx).edit().putString(KEY_AI_KEY, v.trim()).apply()
+    }
+
+    fun hasAiKey(ctx: Context): Boolean = getAiApiKey(ctx).isNotBlank()
+}

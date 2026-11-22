@@ -12,7 +12,7 @@
       "step6": "最终 XNXQDM 用于 POST /jwapp/sys/wdkb/modules/xskcb/xskcb.do body=XNXQDM=..."
     },
     "evidence": [
-      "app/src/main/java/com/imsx3d/classy/ui/screen/imports/JwWebViewLoginScreen.kt L397-444",
+      "app/src/main/java/com/easykebiao/app/ui/screen/imports/JwWebViewLoginScreen.kt L397-444",
       "本地参考（未入库）: jlu.js L180: res?.datas?.dqxnxq?.rows?.[0], r.DM / r.MC 字段命名交叉确认",
       "本地参考（未入库）: jw_fixtures/wisedu-json/dqxnxq_multi_semester.json.expected.json (SFDQ 字符串与数字两种形态)"
     ]

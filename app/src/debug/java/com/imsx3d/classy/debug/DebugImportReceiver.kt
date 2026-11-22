@@ -1,14 +1,14 @@
-package com.imsx3d.classy.debug
+package com.easykebiao.app.debug
 
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import com.imsx3d.classy.SleepyApp
-import com.imsx3d.classy.data.entity.TimeTableEntity
-import com.imsx3d.classy.data.parser.ScheduleParser
-import com.imsx3d.classy.widget.notification.FluidCloudService
+import com.easykebiao.app.SleepyApp
+import com.easykebiao.app.data.entity.TimeTableEntity
+import com.easykebiao.app.data.parser.ScheduleParser
+import com.easykebiao.app.widget.notification.FluidCloudService
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.runBlocking
 import java.io.File
@@ -141,7 +141,7 @@ class DebugImportReceiver : Activity() {
                         repo.setDefault(id)
                         id
                     }
-                    val c = com.imsx3d.classy.data.entity.CourseEntity(
+                    val c = com.easykebiao.app.data.entity.CourseEntity(
                         groupId = java.util.UUID.randomUUID().toString(),
                         tableId = tid,
                         courseName = intent.getStringExtra("courseName") ?: "流体云测试课",
@@ -184,7 +184,7 @@ class DebugImportReceiver : Activity() {
                             startDate = parseResult.startDate.ifBlank { java.time.LocalDate.now().toString() },
                             maxWeek = 20,
                             nodesPerDay = 13,
-                            timeJson = com.imsx3d.classy.util.TimeTableUtils.DEFAULT_TIME_JSON,
+                            timeJson = com.easykebiao.app.util.TimeTableUtils.DEFAULT_TIME_JSON,
                             color = "#FF6750A4",
                             isDefault = false
                         )

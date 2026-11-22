@@ -10,12 +10,12 @@ plugins {
 }
 
 android {
-    namespace = "com.imsx3d.classy"
+    namespace = "com.easykebiao.app"
     compileSdk = 37
     sourceSets.getByName("androidTest").assets.srcDir("schemas")
 
     defaultConfig {
-        applicationId = "com.imsx3d.classy"
+        applicationId = "com.easykebiao.app"
         minSdk = 26
         targetSdk = 37
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -29,8 +29,8 @@ android {
         // 0.0.8 = 分发前的收口：自动检查更新恢复默认开（原始顾虑已消失）+ 注释与实现对齐
         // 0.12.0-schools = 教务导入学校 350 → 388（582 所官网探测 + 正文证据判型）
         // 0.13.0-launch = 设置 → 通用新增「启动直达页面」
-        versionCode = 26
-        versionName = "0.13.1-widget"
+        versionCode = 31
+        versionName = "1.0.1"
         vectorDrawables { useSupportLibrary = true }
         androidResources {
             localeFilters += listOf("zh-rCN", "en")

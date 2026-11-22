@@ -129,9 +129,9 @@
         <!-- 待办闹钟：响铃 / 通知上的「完成」「稍后」，以及开机重排 -->
         <receiver android:name=".widget.notification.TodoReminderReceiver" android:exported="false">
             <intent-filter>
-                <action android:name="com.imsx3d.classy.action.TODO_REMIND" />
-                <action android:name="com.imsx3d.classy.action.TODO_REMIND_COMPLETE" />
-                <action android:name="com.imsx3d.classy.action.TODO_REMIND_SNOOZE" />
+                <action android:name="com.easykebiao.app.action.TODO_REMIND" />
+                <action android:name="com.easykebiao.app.action.TODO_REMIND_COMPLETE" />
+                <action android:name="com.easykebiao.app.action.TODO_REMIND_SNOOZE" />
             </intent-filter>
         </receiver>
         <receiver android:name=".widget.notification.TodoReminderBootReceiver" android:exported="true">

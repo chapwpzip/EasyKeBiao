@@ -14,7 +14,7 @@
 ## 验证证据
 
 - 最新Debug/AndroidTest构建、2347项JVM测试通过；app lint 0 errors/590 warnings/22 hints，glasense-ui lint 0 errors/13 warnings。没有用忽略开关压制原先4项NewApi错误。
-- 首次整轮模拟器16项测试通过：CourseReading、ClassyBrandCard、WidgetCardGeometry、ScheduleHeaderFlow、SemesterFlow。后续根据截图将简单混白改为HSL限幅、礼花发射点移至边缘，再跑课程阅读和品牌8项测试全部通过；不要把重复项算成24个独立测试。
+- 首次整轮模拟器16项测试通过：CourseReading、AppBrandCard、WidgetCardGeometry、ScheduleHeaderFlow、SemesterFlow。后续根据截图将简单混白改为HSL限幅、礼花发射点移至边缘，再跑课程阅读和品牌8项测试全部通过；不要把重复项算成24个独立测试。
 - 课程读取截图覆盖浅/深色与1.0/1.5字号；标题有无副信息起点一致。250组高饱和/中性色及中灰反例核验正常前景4.5:1；不把正常态数值等同于灰显叠加或照片背景全覆盖。
 - 学期核心6项测试包含单双周、同名不同身份/教师、非常规时间/缺作息、跨学期调休、逐日与共享解析一致；页面测试核对真实选择结果时间和教室。
 - 已覆盖安装vivo平板401G5705710000H，保留用户数据和组件绑定。实查更多入口→学期列表→日期明细→横屏→恢复方向→返回。横屏限宽、顶部安全区、明细可读；设备旋转设置已还原。未改用户课程。

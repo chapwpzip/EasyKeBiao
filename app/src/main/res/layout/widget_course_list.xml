@@ -3,7 +3,7 @@
      与既有 widget_scroll_*.xml 的区别：这里 ListView 的每一行是**真实布局**
      （widget_course_row.xml），不是「整张长图切成一行」。因此没有位图缩放、
      没有 setViewLayoutHeight 钉行高那套 API31+ 依赖，各厂商 launcher 都能滚动。
-     @see com.imsx3d.classy.widget.CourseRowWidgetService -->
+     @see com.easykebiao.app.widget.CourseRowWidgetService -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_list_card"
     android:layout_gravity="center"

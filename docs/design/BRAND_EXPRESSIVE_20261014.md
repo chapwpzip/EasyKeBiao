@@ -10,7 +10,7 @@
 
 浅色网格色条卡：底板语义色混入4.5%前景形成淡灰卡面，修复默认主题卡与底板均为白色的层次缺失。深色延续上一批柔化表面，填充模式不受影响，色条内缩保留。
 
-验证：Debug及AndroidTest构建通过；ClassyBrandCardTest与CourseReadingTest共9项通过。截图已检查brand-bold-rest.png、brand-bold-burst.png、marker-light-layer.png，位于本机证据目录。最新ARM64测试包已覆盖安装vivo平板。
+验证：Debug及AndroidTest构建通过；AppBrandCardTest与CourseReadingTest共9项通过。截图已检查brand-bold-rest.png、brand-bold-burst.png、marker-light-layer.png，位于本机证据目录。最新ARM64测试包已覆盖安装vivo平板。
 
 边界：本轮未实测完整平板品牌交互、系统关闭动画、帧时间差值；图像通过不代表真机艺术体验已获用户认可。160粒子绘制成本有待真机测量。未推送或修改版本/tag/Release。
 
@@ -24,4 +24,4 @@ BrandFireworks负责纯时间/容量逻辑，页面仅一个帧时钟驱动所�
 新增逻辑测试覆盖快慢密度差、旧粒子不复位、1000次连续输入容量上限、末轮过期清空。设备测试新增12次连续追加与停手后画面稳定截图；最终结果见brand-continuous-tests.txt，不能将逻辑上限等同于真机帧率达标。
 
 
-持续喷射本批结果：Debug/AndroidTest构建通过，BrandFireworksTest 2项通过，ClassyBrandCardTest 8项通过。已查看brand-continuous-peak.png与停手稳定性测试；vivo平板覆盖安装成功。交付包交付目录/Classy-持续礼花-20261014/Classy-test-arm64.apk。未做真机帧时间专项测量，未提交/推送。
+持续喷射本批结果：Debug/AndroidTest构建通过，BrandFireworksTest 2项通过，AppBrandCardTest 8项通过。已查看brand-continuous-peak.png与停手稳定性测试；vivo平板覆盖安装成功。交付包交付目录/Classy-持续礼花-20261014/Classy-test-arm64.apk。未做真机帧时间专项测量，未提交/推送。

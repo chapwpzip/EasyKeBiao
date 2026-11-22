@@ -1,4 +1,4 @@
-package com.imsx3d.classy.widget
+package com.easykebiao.app.widget
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
@@ -34,7 +34,7 @@ class WidgetRenderActivity : Activity() {
         val which = intent.getStringExtra("widget") ?: "weekgrid"
         // 设计 §7 三档重定档 (评审 #19): L=300×250, M=300×160
         // UI-4d: 允许 adb 指定尺寸（按真机 widget 尺寸截图核对版式）
-        //   adb shell am start -n com.imsx3d.classy/.widget.WidgetRenderActivity         //       --es widget weekgrid --ei w 380 --ei h 700
+        //   adb shell am start -n com.easykebiao.app/.widget.WidgetRenderActivity         //       --es widget weekgrid --ei w 380 --ei h 700
         val defaultSize = when (which) {
             "today_wide", "twoday_wide", "weeklist_wide" -> 300f to 160f
             else -> 300f to 250f
